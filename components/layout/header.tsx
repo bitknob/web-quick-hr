@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Bell, Search, User, Settings, LogOut } from "lucide-react";
+import { Bell, User, Settings, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
 import { Dropdown, DropdownItem, DropdownDivider, DropdownHeader } from "@/components/ui/dropdown";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { Notification } from "@/lib/types";
+import { GlobalSearch } from "./global-search";
 
 const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
@@ -39,14 +39,7 @@ export function Header() {
         <div className="flex-1"></div>
         
         <div className="flex-1 flex justify-center max-w-md">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search employees, approvals..."
-              className="pl-10"
-            />
-          </div>
+          <GlobalSearch />
         </div>
 
         <div className="flex-1 flex items-center justify-end gap-4">
