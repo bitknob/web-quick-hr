@@ -18,6 +18,7 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
+  Grid3x3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -57,26 +58,54 @@ export function Sidebar() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isLoadingMenu, setIsLoadingMenu] = useState(true);
 
+  const isEmptyObject = (obj: unknown): boolean => {
+    if (!obj || typeof obj !== "object" || obj === null) return false;
+    return Object.keys(obj).length === 0;
+  };
+
   useEffect(() => {
     const fetchMenu = async () => {
       try {
         const response = await authApi.getMenu();
-        setMenuItems(response.response);
-        // Auto-expand items that have active children
-        const activeExpanded = new Set<string>();
-        response.response.forEach((item) => {
-          if (item.children) {
-            const hasActiveChild = item.children.some(
-              (child) => pathname === child.path || pathname.startsWith(child.path + "/")
-            );
-            if (hasActiveChild || pathname === item.path || pathname.startsWith(item.path + "/")) {
-              activeExpanded.add(item.id);
+        const items = response.response || [];
+        
+        // Check if all items are empty objects
+        const allEmpty = items.length > 0 && items.every(isEmptyObject);
+        
+        if (allEmpty) {
+          // Set empty array to show placeholder icons
+          setMenuItems([]);
+        } else {
+          // Filter out empty objects and set valid menu items
+          const validItems = items.filter((item) => !isEmptyObject(item));
+          setMenuItems(validItems);
+          
+          // Auto-expand items that have active children
+          const activeExpanded = new Set<string>();
+          validItems.forEach((item) => {
+            if (item.children) {
+              const hasActiveChild = item.children.some(
+                (child) => pathname === child.path || pathname.startsWith(child.path + "/")
+              );
+              if (hasActiveChild || pathname === item.path || pathname.startsWith(item.path + "/")) {
+                activeExpanded.add(item.id);
+              }
             }
-          }
-        });
-        setExpandedItems(activeExpanded);
+          });
+          setExpandedItems(activeExpanded);
+        }
       } catch (error) {
-        console.error("Failed to fetch menu:", error);
+        // Check if it's a network error
+        const isNetworkError = error instanceof Error && 
+          (error.message === "Network Error" || 
+           error.message.includes("ERR_NETWORK") ||
+           error.message.includes("Failed to fetch"));
+        
+        if (isNetworkError) {
+          console.warn("Menu API unavailable - API server may not be running. Using empty menu.");
+        } else {
+          console.error("Failed to fetch menu:", error);
+        }
         // Fallback to empty menu or default menu
         setMenuItems([]);
       } finally {
@@ -194,7 +223,7 @@ export function Sidebar() {
 
                 return (
                   <motion.div
-                    key={item.id}
+                    key={item.id || `menu-item-${index}-${item.path || item.label || 'unknown'}`}
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: index * 0.05 }}
@@ -218,7 +247,7 @@ export function Sidebar() {
                             <ChevronRight className="h-4 w-4" />
                           )}
                         </button>
-                      ) : (
+                      ) : item.path ? (
                         <Link
                           href={item.path}
                           onClick={() => setIsMobileOpen(false)}
@@ -232,6 +261,16 @@ export function Sidebar() {
                           <Icon className="h-5 w-5" />
                           <span className="font-medium">{item.label}</span>
                         </Link>
+                      ) : (
+                        <div
+                          className={cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+                            "text-gray-700 dark:text-gray-300 opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span className="font-medium">{item.label}</span>
+                        </div>
                       )}
 
                       <AnimatePresence>
@@ -250,10 +289,10 @@ export function Sidebar() {
                                 let isChildActive = pathname === child.path;
                                 // Prefix match only if child path is longer than parent (more specific)
                                 // This prevents matching when child has same path as parent
-                                if (!isChildActive && child.path.length > item.path.length) {
+                                if (!isChildActive && child.path && item.path && child.path.length > item.path.length) {
                                   isChildActive = pathname.startsWith(child.path + "/");
                                 }
-                                return (
+                                return child.path ? (
                                   <Link
                                     key={child.id}
                                     href={child.path}
@@ -267,6 +306,16 @@ export function Sidebar() {
                                   >
                                     <span className="font-medium">{child.label}</span>
                                   </Link>
+                                ) : (
+                                  <div
+                                    key={child.id}
+                                    className={cn(
+                                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm",
+                                      "text-gray-600 dark:text-gray-400 opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    <span className="font-medium">{child.label}</span>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -278,8 +327,18 @@ export function Sidebar() {
                 );
               })
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                No menu items available
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center justify-center h-12"
+                  >
+                    <Grid3x3 className="h-5 w-5 text-gray-400 dark:text-gray-600" />
+                  </motion.div>
+                ))}
               </div>
             )}
           </nav>

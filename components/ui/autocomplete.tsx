@@ -204,7 +204,7 @@ export function Autocomplete({
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              "pl-10 pr-10",
+              "pl-10 pr-10 border-0 shadow-none bg-transparent",
               error && "border-red-500",
               selectedOption && "pr-10"
             )}

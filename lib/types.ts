@@ -59,6 +59,8 @@ export interface Department {
   name: string;
   description?: string;
   headId?: string;
+  parentDepartmentId?: string;
+  hasSubDepartments?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -157,4 +159,345 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface Role {
+  id: string;
+  roleKey: string;
+  name: string;
+  description?: string;
+  hierarchyLevel: number;
+  parentRoleId?: string;
+  companyId?: string;
+  isSystemRole: boolean;
+  isActive: boolean;
+  permissions: Record<string, unknown>;
+  menuAccess: string[];
+  canAccessAllCompanies: boolean;
+  canAccessMultipleCompanies: boolean;
+  canAccessSingleCompany: boolean;
+  canManageCompanies: boolean;
+  canCreateCompanies: boolean;
+  canManageProviderStaff: boolean;
+  canManageEmployees: boolean;
+  canApproveLeaves: boolean;
+  canViewPayroll: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserModule {
+  id: string;
+  userId: string;
+  moduleKey: string;
+  moduleName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Payroll Types
+export interface SalaryComponent {
+  id?: string;
+  componentName: string;
+  componentType: "earning" | "deduction";
+  componentCategory: string;
+  isPercentage: boolean;
+  value: number;
+  percentageOf?: string;
+  isTaxable: boolean;
+  isStatutory: boolean;
+  priority: number;
+  isActive?: boolean;
+}
+
+export interface SalaryStructure {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  components?: SalaryComponent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxSlab {
+  from: number;
+  to: number | null;
+  rate?: number;
+  amount?: number;
+}
+
+export interface HousingAllowanceExemptionRules {
+  type: "percentage_of_basic" | "fixed_amount" | "actual_rent";
+  maxPercentage?: number;
+  minRentPercentage?: number;
+  amount?: number;
+}
+
+export interface TravelAllowanceExemptionRules {
+  type: "actual_expense" | "fixed_amount" | "percentage_of_basic";
+  amount?: number;
+  percentage?: number;
+}
+
+export interface TaxExemptions {
+  section80C?: number;
+  section80D?: number;
+  section80G?: number;
+  section24?: number;
+  [key: string]: number | undefined;
+}
+
+export interface TaxConfiguration {
+  id: string;
+  companyId: string;
+  country: string;
+  state?: string;
+  province?: string;
+  financialYear: string;
+  incomeTaxEnabled?: boolean;
+  incomeTaxSlabs?: TaxSlab[];
+  socialSecurityEnabled?: boolean;
+  socialSecurityEmployerRate?: number;
+  socialSecurityEmployeeRate?: number;
+  socialSecurityMaxSalary?: number;
+  healthInsuranceEnabled?: boolean;
+  healthInsuranceEmployerRate?: number;
+  healthInsuranceEmployeeRate?: number;
+  healthInsuranceMaxSalary?: number;
+  professionalTaxEnabled?: boolean;
+  professionalTaxSlabs?: TaxSlab[];
+  housingAllowanceExemptionRules?: HousingAllowanceExemptionRules;
+  travelAllowanceExemptionRules?: TravelAllowanceExemptionRules;
+  standardDeduction?: number;
+  taxExemptions?: TaxExemptions;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayrollRun {
+  id: string;
+  companyId: string;
+  payrollMonth: number;
+  payrollYear: number;
+  status: "draft" | "processing" | "completed" | "locked" | "failed";
+  totalEmployees: number;
+  processedEmployees: number;
+  failedEmployees: number;
+  processedBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Payslip {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  payrollRunId: string;
+  payslipNumber: string;
+  month: number;
+  year: number;
+  status: "generated" | "approved" | "locked";
+  ctc: number;
+  grossSalary: number;
+  totalEarnings: number;
+  totalDeductions: number;
+  netSalary: number;
+  earningsBreakdown: Record<string, number>;
+  deductionsBreakdown: Record<string, number>;
+  tdsAmount: number;
+  professionalTaxAmount: number;
+  epfEmployeeAmount: number;
+  epfEmployerAmount: number;
+  esiEmployeeAmount: number;
+  esiEmployerAmount: number;
+  taxExemptions?: {
+    housingAllowanceExemption: number;
+    travelAllowanceExemption: number;
+    standardDeduction: number;
+    totalExemptions: number;
+  };
+  taxableIncome: number;
+  createdAt: string;
+}
+
+export interface PayslipTemplate {
+  id: string;
+  companyId: string;
+  templateName: string;
+  templateType: "simple" | "detailed" | "custom";
+  description?: string;
+  headerConfiguration?: Record<string, unknown>;
+  footerConfiguration?: Record<string, unknown>;
+  bodyConfiguration?: Record<string, unknown>;
+  stylingConfiguration?: Record<string, unknown>;
+  sectionsConfiguration?: Record<string, unknown>;
+  watermarkSettings?: Record<string, unknown>;
+  brandingSettings?: Record<string, unknown>;
+  isDefault: boolean;
+  status?: "draft" | "active" | "inactive";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayslipSchedule {
+  id: string;
+  companyId: string;
+  scheduleName: string;
+  description?: string;
+  frequency: "monthly" | "biweekly" | "weekly" | "custom";
+  generationDay?: number;
+  generationTime: string;
+  timezone: string;
+  triggerType: "scheduled" | "manual";
+  autoApprove?: boolean;
+  autoSend?: boolean;
+  emailConfiguration?: Record<string, unknown>;
+  notificationConfiguration?: Record<string, unknown>;
+  enabledMonths?: number[];
+  enabledYears?: number[];
+  excludedDates?: string[];
+  nextRunAt?: string;
+  status?: "active" | "inactive" | "paused";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VariablePayType =
+  | "bonus"
+  | "incentive"
+  | "commission"
+  | "overtime"
+  | "shift_allowance"
+  | "performance_bonus"
+  | "retention_bonus"
+  | "other";
+
+export interface VariablePay {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  variablePayType: VariablePayType;
+  description?: string;
+  amount: number;
+  calculationBasis?: string;
+  calculationDetails?: Record<string, unknown>;
+  applicableMonth: number;
+  applicableYear: number;
+  isTaxable: boolean;
+  isRecurring: boolean;
+  isApproved: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ArrearsType =
+  | "salary_revision"
+  | "promotion"
+  | "retroactive_adjustment"
+  | "correction"
+  | "bonus_arrears"
+  | "allowance_adjustment"
+  | "other";
+
+export interface Arrears {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  arrearsType: ArrearsType;
+  description?: string;
+  originalPeriodFrom: string;
+  originalPeriodTo: string;
+  adjustmentAmount: number;
+  breakdown?: Record<string, number>;
+  reason?: string;
+  applicableMonth: number;
+  applicableYear: number;
+  isTaxable: boolean;
+  taxCalculationBasis?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LoanType =
+  | "personal_loan"
+  | "advance_salary"
+  | "home_loan"
+  | "vehicle_loan"
+  | "education_loan"
+  | "medical_loan"
+  | "other";
+
+export interface Loan {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  loanType: LoanType;
+  loanName: string;
+  principalAmount: number;
+  interestRate: number;
+  tenureMonths: number;
+  startDate: string;
+  deductionStartMonth: number;
+  deductionStartYear: number;
+  loanTerms?: Record<string, unknown>;
+  emiAmount: number;
+  remainingBalance: number;
+  status: "active" | "completed" | "closed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReimbursementType =
+  | "travel"
+  | "medical"
+  | "meal"
+  | "telephone"
+  | "internet"
+  | "fuel"
+  | "conveyance"
+  | "other";
+
+export type ReimbursementStatus = "draft" | "submitted" | "approved" | "rejected" | "paid";
+
+export interface Reimbursement {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  reimbursementType: ReimbursementType;
+  description?: string;
+  claimAmount: number;
+  approvedAmount?: number;
+  claimDate: string;
+  documents?: string[];
+  expenseBreakdown?: Record<string, number>;
+  applicableMonth: number;
+  applicableYear: number;
+  isTaxable: boolean;
+  taxExemptionLimit?: number;
+  status: ReimbursementStatus;
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxDeclaration {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  financialYear: string;
+  declarations: Record<string, Record<string, number>>;
+  verifiedAmount?: number;
+  status: "draft" | "submitted" | "verified" | "rejected";
+  notes?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -6,12 +6,16 @@ export interface CreateDepartmentRequest {
   name: string;
   description?: string;
   headId?: string;
+  parentDepartmentId?: string;
+  hasSubDepartments?: boolean;
 }
 
 export interface UpdateDepartmentRequest {
   name?: string;
   description?: string;
   headId?: string;
+  parentDepartmentId?: string;
+  hasSubDepartments?: boolean;
 }
 
 export interface GetDepartmentsParams {
@@ -41,6 +45,14 @@ export const departmentsApi = {
 
   deleteDepartment: async (id: string): Promise<ApiResponse<null>> => {
     return apiClient.delete(`/api/departments/${id}`);
+  },
+
+  getSubDepartments: async (id: string): Promise<ApiResponse<Department[]>> => {
+    return apiClient.get(`/api/departments/${id}/sub-departments`);
+  },
+
+  getTopLevelDepartments: async (companyId: string): Promise<ApiResponse<Department[]>> => {
+    return apiClient.get(`/api/departments/top-level/list?companyId=${companyId}`);
   },
 };
 
