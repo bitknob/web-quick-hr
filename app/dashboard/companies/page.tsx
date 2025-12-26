@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -13,6 +13,7 @@ import { Company } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 
 const getCompanyInitials = (name: string): string => {
@@ -26,9 +27,11 @@ const getCompanyInitials = (name: string): string => {
 export default function CompaniesPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const hasFetchedRef = useRef(false);
 
   const fetchCompanies = useCallback(async () => {
     setIsLoading(true);
@@ -48,8 +51,8 @@ export default function CompaniesPage() {
         const status = (error as { response?: { status?: number } }).response?.status;
         if (status !== 404) {
           addToast({
-            title: "Error",
-            description: errorMessage || "Failed to fetch companies",
+            title: t.toast.error,
+            description: errorMessage || t.companies.failedToFetchCompanies,
             variant: "error",
           });
         }
@@ -57,11 +60,20 @@ export default function CompaniesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, addToast]);
+  }, [searchTerm, addToast, t.companies.failedToFetchCompanies, t.toast.error]);
 
   useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
+    if (hasFetchedRef.current && searchTerm === "") return;
+    
+    const fetchData = async () => {
+      if (!hasFetchedRef.current || searchTerm !== "") {
+        hasFetchedRef.current = true;
+        await fetchCompanies();
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -71,13 +83,13 @@ export default function CompaniesPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Companies</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your organization&apos;s companies</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.companies.title}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.companies.description}</p>
         </div>
         <Link href="/dashboard/companies/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Company
+            {t.companies.addCompany}
           </Button>
         </Link>
       </motion.div>
@@ -89,14 +101,14 @@ export default function CompaniesPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search companies..."
+                placeholder={t.companies.searchCompanies}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && fetchCompanies()}
                 className="pl-10"
               />
             </div>
-            <Button onClick={fetchCompanies}>Search</Button>
+            <Button onClick={fetchCompanies}>{t.common.search}</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -107,11 +119,11 @@ export default function CompaniesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Company</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Code</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Description</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.companies.companyName}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.companies.companyCode}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.companies.companyDescription}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.status}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,10 +189,10 @@ export default function CompaniesPage() {
           ) : (
             <EmptyState
               icon={Building2}
-              title="No companies found"
-              description="Get started by creating a new company"
+              title={t.companies.noCompaniesFound}
+              description={t.companies.getStartedByCreating}
               action={{
-                label: "Add Company",
+                label: t.companies.addCompany,
                 onClick: () => router.push("/dashboard/companies/new"),
               }}
             />

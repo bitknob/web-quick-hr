@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save } from "lucide-react";
 import { companiesApi } from "@/lib/api/companies";
 import { useToast } from "@/components/ui/toast";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,6 +26,7 @@ type NewCompanyFormData = z.infer<typeof newCompanySchema>;
 export default function NewCompanyPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [isSaving, setIsSaving] = useState(false);
 
   const {
@@ -45,8 +47,8 @@ export default function NewCompanyPage() {
         hrbpId: data.hrbpId || undefined,
       });
       addToast({
-        title: "Success",
-        description: "Company created successfully",
+        title: t.toast.success,
+        description: t.companies.companyCreatedSuccessfully,
         variant: "success",
       });
       router.push(`/dashboard/companies/${response.response.id}`);
@@ -55,8 +57,8 @@ export default function NewCompanyPage() {
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to create company",
+        title: t.toast.error,
+        description: errorMessage || t.companies.failedToCreateCompany,
         variant: "error",
       });
     } finally {
@@ -99,7 +101,7 @@ export default function NewCompanyPage() {
                   </label>
                   <Input
                     id="name"
-                    placeholder="Enter company name"
+                    placeholder={t.companies.enterCompanyName}
                     {...register("name")}
                     className={errors.name ? "border-red-500" : ""}
                   />
@@ -114,7 +116,7 @@ export default function NewCompanyPage() {
                   </label>
                   <Input
                     id="code"
-                    placeholder="ACME001"
+                    placeholder={t.companies.enterCompanyCode}
                     {...register("code")}
                     className={errors.code ? "border-red-500" : ""}
                   />
@@ -132,7 +134,7 @@ export default function NewCompanyPage() {
                   </label>
                   <Input
                     id="description"
-                    placeholder="Enter company description"
+                    placeholder={t.companies.enterCompanyDescription}
                     {...register("description")}
                   />
                 </div>
@@ -143,7 +145,7 @@ export default function NewCompanyPage() {
                   </label>
                   <Input
                     id="hrbpId"
-                    placeholder="Enter HRBP UUID (optional)"
+                    placeholder={t.companies.enterHrbpUuidOptional}
                     {...register("hrbpId")}
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

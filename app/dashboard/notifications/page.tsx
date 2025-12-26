@@ -11,14 +11,19 @@ import { Notification } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import { formatDateTime, getErrorMessage } from "@/lib/utils";
 import { useCallback } from "react";
 
 export default function NotificationsPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -27,14 +32,14 @@ export default function NotificationsPage() {
       setNotifications(response.response);
     } catch (error: unknown) {
       addToast({
-        title: "Error",
+        title: t.toast.error,
         description: getErrorMessage(error),
         variant: "error",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, t.toast.error]);
 
   useEffect(() => {
     fetchNotifications();
@@ -44,14 +49,14 @@ export default function NotificationsPage() {
     try {
       await notificationsApi.markAsRead(id);
       addToast({
-        title: "Success",
-        description: "Notification marked as read",
+        title: t.toast.success,
+        description: t.notifications.notificationMarkedAsRead,
         variant: "success",
       });
       fetchNotifications();
     } catch (error: unknown) {
       addToast({
-        title: "Error",
+        title: t.toast.error,
         description: getErrorMessage(error),
         variant: "error",
       });
@@ -62,34 +67,41 @@ export default function NotificationsPage() {
     try {
       await notificationsApi.markAllAsRead();
       addToast({
-        title: "Success",
-        description: "All notifications marked as read",
+        title: t.toast.success,
+        description: t.notifications.allNotificationsMarkedAsRead,
         variant: "success",
       });
       fetchNotifications();
     } catch (error: unknown) {
       addToast({
-        title: "Error",
+        title: t.toast.error,
         description: getErrorMessage(error),
         variant: "error",
       });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this notification?")) return;
+  const handleDeleteClick = (id: string) => {
+    setNotificationToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!notificationToDelete) return;
 
     try {
-      await notificationsApi.deleteNotification(id);
+      await notificationsApi.deleteNotification(notificationToDelete);
       addToast({
-        title: "Success",
-        description: "Notification deleted successfully",
+        title: t.toast.success,
+        description: t.notifications.notificationDeleted,
         variant: "success",
       });
       fetchNotifications();
+      setDeleteDialogOpen(false);
+      setNotificationToDelete(null);
     } catch (error: unknown) {
       addToast({
-        title: "Error",
+        title: t.toast.error,
         description: getErrorMessage(error),
         variant: "error",
       });
@@ -115,22 +127,22 @@ export default function NotificationsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Notifications</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.notifications.title}</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "All caught up!"}
+            {unreadCount > 0 ? `${unreadCount} ${unreadCount > 1 ? t.notifications.unreadNotifications : t.notifications.unreadNotification}` : t.notifications.allCaughtUp}
           </p>
         </div>
         {unreadCount > 0 && (
           <Button variant="outline" onClick={handleMarkAllAsRead}>
             <CheckCheck className="h-4 w-4 mr-2" />
-            Mark all as read
+            {t.notifications.markAllAsRead}
           </Button>
         )}
       </motion.div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Notifications</CardTitle>
+          <CardTitle>{t.notifications.allNotifications}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -185,7 +197,7 @@ export default function NotificationsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(notification.id)}
+                        onClick={() => handleDeleteClick(notification.id)}
                         className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -198,12 +210,25 @@ export default function NotificationsPage() {
           ) : (
             <EmptyState
               icon={Bell}
-              title="No notifications"
-              description="You're all caught up! No new notifications."
+              title={t.notifications.noNotifications}
+              description={t.notifications.allCaughtUpDescription}
             />
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title={t.dialog.deleteNotification.title}
+        message={t.dialog.deleteNotification.message}
+        confirmText={t.common.delete}
+        cancelText={t.common.cancel}
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setNotificationToDelete(null);
+        }}
+      />
     </div>
   );
 }

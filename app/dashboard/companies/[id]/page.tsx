@@ -12,6 +12,7 @@ import { ArrowLeft, Save, Upload, Image as ImageIcon } from "lucide-react";
 import { companiesApi } from "@/lib/api/companies";
 import { Company } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +30,7 @@ export default function CompanyDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -88,8 +90,8 @@ export default function CompanyDetailPage() {
         status: data.status,
       });
       addToast({
-        title: "Success",
-        description: "Company updated successfully",
+        title: t.toast.success,
+        description: t.companies.companyUpdatedSuccessfully,
         variant: "success",
       });
       fetchCompany(company.id);
@@ -298,7 +300,7 @@ export default function CompanyDetailPage() {
                   </label>
                   <Input
                     id="hrbpId"
-                    placeholder="Enter HRBP UUID"
+                    placeholder={t.companies.enterHrbpUuid}
                     {...register("hrbpId")}
                   />
                 </div>

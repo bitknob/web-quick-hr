@@ -12,6 +12,7 @@ import { SearchResult } from "@/lib/api/search";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import { getErrorMessage } from "@/lib/utils";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
@@ -42,6 +43,7 @@ function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [groupedResults, setGroupedResults] = useState<Record<string, SearchResult[]>>({});
@@ -82,7 +84,7 @@ function SearchPageContent() {
       setGroupedResults(grouped);
     } catch (error: unknown) {
       addToast({
-        title: "Error",
+        title: t.toast.error,
         description: getErrorMessage(error),
         variant: "error",
       });
@@ -91,7 +93,7 @@ function SearchPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, t.toast.error]);
 
   useEffect(() => {
     const queryTerm = searchParams.get("q");
@@ -142,7 +144,7 @@ function SearchPageContent() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="search"
-                  placeholder="Search employees, companies, departments..."
+                  placeholder={t.search.placeholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -174,8 +176,8 @@ function SearchPageContent() {
           ) : searchTerm.length < 2 ? (
             <EmptyState
               icon={Search}
-              title="Start searching"
-              description="Enter at least 2 characters to search"
+              title={t.search.startSearching}
+              description={t.search.enterAtLeastTwoCharacters}
             />
           ) : results.length > 0 ? (
             <div className="space-y-8">
@@ -223,8 +225,8 @@ function SearchPageContent() {
           ) : (
             <EmptyState
               icon={Search}
-              title="No results found"
-              description={`No results found for "${searchTerm}". Try a different search term.`}
+              title={t.common.noResults}
+              description={`${t.search.noResultsFor} "${searchTerm}". ${t.search.tryDifferentSearchTerm}.`}
             />
           )}
         </CardContent>

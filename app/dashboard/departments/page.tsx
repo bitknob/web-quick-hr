@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,19 +13,28 @@ import { Department, Employee } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 
 export default function DepartmentsPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [departmentHeads, setDepartmentHeads] = useState<Record<string, Employee>>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [departmentToDelete, setDepartmentToDelete] = useState<string | null>(null);
+  const hasFetchedEmployeeRef = useRef(false);
 
   useEffect(() => {
+    if (hasFetchedEmployeeRef.current) return;
+    
     const fetchCurrentEmployee = async () => {
+      hasFetchedEmployeeRef.current = true;
       try {
         const response = await employeesApi.getCurrentEmployee();
         if (response.response?.companyId) {
@@ -75,39 +84,55 @@ export default function DepartmentsPage() {
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to fetch departments",
+        title: t.toast.error,
+        description: errorMessage || t.departments.failedToFetchDepartments,
         variant: "error",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, addToast]);
+  }, [companyId, addToast, t.departments.failedToFetchDepartments, t.toast.error]);
 
+  const hasFetchedDepartmentsRef = useRef(false);
+  
   useEffect(() => {
-    // Fetch departments - API will auto-filter by user's company if companyId is not provided
-    fetchDepartments();
+    if (hasFetchedDepartmentsRef.current && companyId === null) return;
+    
+    const fetchData = async () => {
+      if (companyId !== null || hasFetchedDepartmentsRef.current === false) {
+        hasFetchedDepartmentsRef.current = true;
+        await fetchDepartments();
+      }
+    };
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this department?")) return;
+  const handleDeleteClick = (id: string) => {
+    setDepartmentToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!departmentToDelete) return;
 
     try {
-      await departmentsApi.deleteDepartment(id);
+      await departmentsApi.deleteDepartment(departmentToDelete);
       addToast({
-        title: "Success",
-        description: "Department deleted successfully",
+        title: t.toast.success,
+        description: t.departments.departmentDeleted,
         variant: "success",
       });
       fetchDepartments();
+      setDeleteDialogOpen(false);
+      setDepartmentToDelete(null);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to delete department",
+        title: t.toast.error,
+        description: errorMessage || t.departments.failedToDeleteDepartment,
         variant: "error",
       });
     }
@@ -130,13 +155,13 @@ export default function DepartmentsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Departments</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your organization&apos;s departments</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.departments.title}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.departments.description}</p>
         </div>
         <Link href="/dashboard/departments/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Department
+            {t.departments.addDepartment}
           </Button>
         </Link>
       </motion.div>
@@ -148,13 +173,13 @@ export default function DepartmentsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search departments..."
+                placeholder={t.departments.searchDepartments}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Button onClick={fetchDepartments}>Refresh</Button>
+            <Button onClick={fetchDepartments}>{t.common.refresh}</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -165,10 +190,10 @@ export default function DepartmentsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Description</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Department Head</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.departments.name}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.departments.departmentDescription}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.departments.departmentHead}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,7 +226,7 @@ export default function DepartmentsPage() {
                               </div>
                             </div>
                           ) : (
-                            <span className="text-gray-400 dark:text-gray-500">Not assigned</span>
+                            <span className="text-gray-400 dark:text-gray-500">{t.departments.notAssigned}</span>
                           )}
                         </td>
                         <td className="py-4 px-4">
@@ -214,7 +239,7 @@ export default function DepartmentsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDelete(department.id)}
+                              onClick={() => handleDeleteClick(department.id)}
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -229,12 +254,12 @@ export default function DepartmentsPage() {
           ) : (
             <EmptyState
               icon={Building2}
-              title="No departments found"
-              description={searchTerm ? "Try a different search term" : "Get started by creating a new department"}
+              title={t.departments.noDepartmentsFound}
+              description={searchTerm ? t.departments.tryDifferentSearch : t.departments.getStartedByCreating}
               action={
                 !searchTerm
                   ? {
-                      label: "Add Department",
+                      label: t.departments.addDepartment,
                       onClick: () => router.push("/dashboard/departments/new"),
                     }
                   : undefined
@@ -243,6 +268,19 @@ export default function DepartmentsPage() {
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title={t.dialog.deleteDepartment.title}
+        message={t.dialog.deleteDepartment.message}
+        confirmText={t.common.delete}
+        cancelText={t.common.cancel}
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setDepartmentToDelete(null);
+        }}
+      />
     </div>
   );
 }

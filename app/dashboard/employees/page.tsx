@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/ui/pagination";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 
 const getEmployeeInitials = (firstName: string, lastName: string): string => {
@@ -25,13 +26,17 @@ const getEmployeeInitials = (firstName: string, lastName: string): string => {
 export default function EmployeesPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const limit = 20;
+  const hasFetchedRef = useRef(false);
 
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -61,41 +66,55 @@ export default function EmployeesPage() {
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to fetch employees",
+        title: t.toast.error,
+        description: errorMessage || t.employees.failedToFetchEmployees,
         variant: "error",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchTerm, limit, addToast]);
+  }, [currentPage, searchTerm, limit, addToast, t.employees.failedToFetchEmployees, t.toast.error]);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+    const fetchData = async () => {
+      if (!hasFetchedRef.current || searchTerm !== "" || currentPage !== 1) {
+        hasFetchedRef.current = true;
+        await fetchEmployees();
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchTerm]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this employee?")) return;
+  const handleDeleteClick = (id: string) => {
+    setEmployeeToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return;
 
     try {
-      await employeesApi.deleteEmployee(id);
+      await employeesApi.deleteEmployee(employeeToDelete);
       addToast({
-        title: "Success",
-        description: "Employee deleted successfully",
+        title: t.toast.success,
+        description: t.employees.employeeDeleted,
         variant: "success",
       });
       fetchEmployees();
+      setDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to delete employee",
+        title: t.toast.error,
+        description: errorMessage || t.employees.failedToDeleteEmployee,
         variant: "error",
       });
     }
@@ -109,13 +128,13 @@ export default function EmployeesPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Employees</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your organization&apos;s employees</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.employees.title}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.employees.description}</p>
         </div>
         <Link href="/dashboard/employees/create">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Employee
+            {t.employees.addEmployee}
           </Button>
         </Link>
       </motion.div>
@@ -127,14 +146,14 @@ export default function EmployeesPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search employees..."
+                placeholder={t.employees.searchEmployees}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && fetchEmployees()}
                 className="pl-10"
               />
             </div>
-            <Button onClick={fetchEmployees}>Search</Button>
+            <Button onClick={fetchEmployees}>{t.common.search}</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -145,12 +164,12 @@ export default function EmployeesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Email</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Job Title</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Department</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.employees.name}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.employees.email}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.employees.jobTitle}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.employees.department}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.employees.status}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,7 +221,7 @@ export default function EmployeesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(employee.id)}
+                            onClick={() => handleDeleteClick(employee.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
@@ -220,7 +239,7 @@ export default function EmployeesPage() {
                     onPageChange={setCurrentPage}
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
-                    Showing {((currentPage - 1) * limit) + 1} to {Math.min(currentPage * limit, totalEmployees)} of {totalEmployees} employees
+                    {t.employees.showing} {((currentPage - 1) * limit) + 1} {t.employees.to} {Math.min(currentPage * limit, totalEmployees)} {t.employees.of} {totalEmployees} {t.employees.employees}
                   </p>
                 </div>
               )}
@@ -228,16 +247,29 @@ export default function EmployeesPage() {
           ) : (
             <EmptyState
               icon={Users}
-              title="No employees found"
-              description="Get started by creating a new employee"
+              title={t.employees.noEmployeesFound}
+              description={t.employees.getStartedByCreating}
               action={{
-                label: "Add Employee",
+                label: t.employees.addEmployee,
                 onClick: () => router.push("/dashboard/employees/create"),
               }}
             />
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title={t.dialog.deleteEmployee.title}
+        message={t.dialog.deleteEmployee.message}
+        confirmText={t.common.delete}
+        cancelText={t.common.cancel}
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setEmployeeToDelete(null);
+        }}
+      />
     </div>
   );
 }

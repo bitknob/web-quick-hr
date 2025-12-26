@@ -501,3 +501,324 @@ export interface TaxDeclaration {
   createdAt: string;
   updatedAt: string;
 }
+
+export type LeaveType = "annual" | "sick" | "casual" | "maternity" | "paternity" | "unpaid";
+
+export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface Leave {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+  status: LeaveStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId: string;
+  };
+  approver?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  };
+}
+
+export interface CreateLeaveRequest {
+  employeeId: string;
+  companyId: string;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+}
+
+export interface UpdateLeaveRequest {
+  leaveType?: LeaveType;
+  startDate?: string;
+  endDate?: string;
+  reason?: string;
+}
+
+export interface GetLeavesByEmployeeParams {
+  companyId?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: LeaveStatus;
+}
+
+export interface GetLeavesByCompanyParams {
+  startDate?: string;
+  endDate?: string;
+  status?: LeaveStatus;
+  leaveType?: LeaveType;
+}
+
+export interface SearchLeavesParams {
+  companyId?: string;
+  employeeId?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: LeaveStatus;
+  leaveType?: LeaveType;
+  page?: number;
+  limit?: number;
+}
+
+export type AttendanceStatus = "present" | "absent" | "late" | "half_day";
+
+export interface Attendance {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  date: string;
+  checkIn?: string;
+  checkOut?: string;
+  status: AttendanceStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId: string;
+  };
+}
+
+export interface CreateAttendanceRequest {
+  employeeId: string;
+  companyId: string;
+  date: string;
+  checkIn?: string;
+  checkOut?: string;
+  status?: AttendanceStatus;
+  notes?: string;
+}
+
+export interface UpdateAttendanceRequest {
+  checkIn?: string;
+  checkOut?: string;
+  status?: AttendanceStatus;
+  notes?: string;
+}
+
+export interface CheckInRequest {
+  checkInTime?: string;
+}
+
+export interface CheckOutRequest {
+  checkOutTime?: string;
+}
+
+export interface GetAttendanceByEmployeeParams {
+  companyId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface GetAttendanceByCompanyParams {
+  startDate?: string;
+  endDate?: string;
+  status?: AttendanceStatus;
+}
+
+export interface GetAttendanceStatsParams {
+  month: number;
+  year: number;
+}
+
+export interface AttendanceStats {
+  workingDays: number;
+  presentDays: number;
+  absentDays: number;
+  leaveDays: number;
+  lateDays: number;
+  halfDayDays: number;
+}
+
+export interface SearchAttendancesParams {
+  companyId?: string;
+  employeeId?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: AttendanceStatus;
+  page?: number;
+  limit?: number;
+}
+
+export type DocumentType =
+  | "id_proof"
+  | "address_proof"
+  | "pan_card"
+  | "aadhaar_card"
+  | "passport"
+  | "driving_license"
+  | "educational_certificate"
+  | "experience_certificate"
+  | "offer_letter"
+  | "appointment_letter"
+  | "relieving_letter"
+  | "salary_slip"
+  | "bank_statement"
+  | "form_16"
+  | "other";
+
+export type DocumentStatus = "pending" | "verified" | "rejected" | "expired";
+
+export interface Document {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  documentType: DocumentType;
+  documentName: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  status: DocumentStatus;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionReason?: string;
+  expiryDate?: string;
+  notes?: string;
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId: string;
+  };
+  verifier?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  };
+}
+
+export interface UploadDocumentRequest {
+  document: File;
+  employeeId: string;
+  companyId: string;
+  documentType: DocumentType;
+  documentName: string;
+  expiryDate?: string;
+  notes?: string;
+}
+
+export interface UpdateDocumentRequest {
+  documentName?: string;
+  expiryDate?: string;
+  notes?: string;
+}
+
+export interface RejectDocumentRequest {
+  rejectionReason: string;
+}
+
+export interface GetDocumentsByEmployeeParams {
+  companyId?: string;
+  documentType?: DocumentType;
+  status?: DocumentStatus;
+}
+
+export interface GetDocumentsByCompanyParams {
+  documentType?: DocumentType;
+  status?: DocumentStatus;
+}
+
+export interface SearchDocumentsParams {
+  companyId?: string;
+  employeeId?: string;
+  documentType?: DocumentType;
+  status?: DocumentStatus;
+  page?: number;
+  limit?: number;
+}
+
+export type MaritalStatus = "single" | "married" | "divorced" | "widowed";
+
+export interface EmployeeDetails {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankIFSC?: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
+  passportNumber?: string;
+  drivingLicenseNumber?: string;
+  bloodGroup?: string;
+  maritalStatus?: MaritalStatus;
+  spouseName?: string;
+  fatherName?: string;
+  motherName?: string;
+  permanentAddress?: string;
+  currentAddress?: string;
+  previousEmployer?: string;
+  previousDesignation?: string;
+  previousSalary?: number;
+  noticePeriod?: number;
+  skills?: string[];
+  languages?: string[];
+  additionalInfo?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId: string;
+  };
+}
+
+export interface CreateOrUpdateEmployeeDetailsRequest {
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankIFSC?: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
+  passportNumber?: string;
+  drivingLicenseNumber?: string;
+  bloodGroup?: string;
+  maritalStatus?: MaritalStatus;
+  spouseName?: string;
+  fatherName?: string;
+  motherName?: string;
+  permanentAddress?: string;
+  currentAddress?: string;
+  previousEmployer?: string;
+  previousDesignation?: string;
+  previousSalary?: number;
+  noticePeriod?: number;
+  skills?: string[];
+  languages?: string[];
+  additionalInfo?: Record<string, unknown>;
+}
+
+export type UpdateEmployeeDetailsRequest = CreateOrUpdateEmployeeDetailsRequest;

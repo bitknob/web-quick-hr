@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { UserModule } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,11 +32,14 @@ const moduleColors: Record<string, string> = {
 export default function UserModulesPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [userModules, setUserModules] = useState<UserModule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
-  const [userMap, setUserMap] = useState<Record<string, { email: string; name?: string }>>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
   const fetchUserModules = useCallback(async () => {
     setIsLoading(true);
@@ -43,53 +48,58 @@ export default function UserModulesPage() {
         isActive: filterActive,
       });
       setUserModules(response.response);
-
-      // Fetch user details for display
-      const userIds = [...new Set(response.response.map((um) => um.userId))];
-      const userDetails: Record<string, { email: string; name?: string }> = {};
-      
-      // Note: In a real app, you'd have a users API to fetch user details
-      // For now, we'll just store the userId and display it
-      userIds.forEach((userId) => {
-        userDetails[userId] = { email: userId.substring(0, 8) + "..." };
-      });
-      setUserMap(userDetails);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to fetch user modules",
+        title: t.toast.error,
+        description: errorMessage || t.userModules.failedToFetchUserModules,
         variant: "error",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [filterActive, addToast]);
+  }, [filterActive, addToast, t.userModules.failedToFetchUserModules, t.toast.error]);
 
   useEffect(() => {
-    fetchUserModules();
-  }, [fetchUserModules]);
+    if (hasFetchedRef.current && filterActive === undefined) return;
+    
+    const fetchData = async () => {
+      if (!hasFetchedRef.current || filterActive !== undefined) {
+        hasFetchedRef.current = true;
+        await fetchUserModules();
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterActive]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this module assignment?")) return;
+  const handleDeleteClick = (id: string) => {
+    setModuleToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!moduleToDelete) return;
 
     try {
-      await userModulesApi.removeUserModule(id);
+      await userModulesApi.removeUserModule(moduleToDelete);
       addToast({
-        title: "Success",
-        description: "Module assignment removed successfully",
+        title: t.toast.success,
+        description: t.userModules.moduleAssignmentRemoved,
         variant: "success",
       });
       fetchUserModules();
+      setDeleteDialogOpen(false);
+      setModuleToDelete(null);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to remove module assignment",
+        title: t.toast.error,
+        description: errorMessage || t.userModules.failedToRemoveModuleAssignment,
         variant: "error",
       });
     }
@@ -113,13 +123,13 @@ export default function UserModulesPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">User Modules</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage module assignments for users</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.userModules.title}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.userModules.description}</p>
         </div>
         <Link href="/dashboard/user-modules/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Assign Module
+            {t.userModules.assignModule}
           </Button>
         </Link>
       </motion.div>
@@ -131,7 +141,7 @@ export default function UserModulesPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search by module, user..."
+                placeholder={t.userModules.searchByModule}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -146,14 +156,14 @@ export default function UserModulesPage() {
                 }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="all">{t.userModules.allStatus}</option>
+                <option value="active">{t.userModules.active}</option>
+                <option value="inactive">{t.userModules.inactive}</option>
               </select>
             </div>
             <Button onClick={fetchUserModules} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              {t.common.refresh}
             </Button>
           </div>
         </CardHeader>
@@ -165,11 +175,11 @@ export default function UserModulesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">User ID</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Module</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Module Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.userId}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.module}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.moduleName}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.status}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,7 +212,7 @@ export default function UserModulesPage() {
                               : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                           }
                         >
-                          {userModule.isActive ? "Active" : "Inactive"}
+                          {userModule.isActive ? t.userModules.active : t.userModules.inactive}
                         </Badge>
                       </td>
                       <td className="py-4 px-4">
@@ -215,7 +225,7 @@ export default function UserModulesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(userModule.id)}
+                            onClick={() => handleDeleteClick(userModule.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
@@ -229,12 +239,12 @@ export default function UserModulesPage() {
           ) : (
             <EmptyState
               icon={Package}
-              title="No module assignments found"
-              description={searchTerm ? "Try a different search term" : "Get started by assigning a module to a user"}
+              title={t.userModules.noModuleAssignmentsFound}
+              description={searchTerm ? t.userModules.tryDifferentSearch : t.userModules.getStartedByAssigning}
               action={
                 !searchTerm
                   ? {
-                      label: "Assign Module",
+                      label: t.userModules.assignModule,
                       onClick: () => router.push("/dashboard/user-modules/new"),
                     }
                   : undefined
@@ -243,6 +253,19 @@ export default function UserModulesPage() {
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title={t.dialog.removeModuleAssignment.title}
+        message={t.dialog.removeModuleAssignment.message}
+        confirmText={t.common.remove}
+        cancelText={t.common.cancel}
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setModuleToDelete(null);
+        }}
+      />
     </div>
   );
 }

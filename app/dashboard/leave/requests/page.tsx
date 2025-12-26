@@ -1,68 +1,61 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar } from "lucide-react";
-import { approvalsApi } from "@/lib/api/approvals";
+import { leavesApi } from "@/lib/api/leaves";
 import { employeesApi } from "@/lib/api/employees";
-import { ApprovalRequest } from "@/lib/types";
+import { Leave } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 
 export default function MyLeaveRequestsPage() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [leaveRequests, setLeaveRequests] = useState<ApprovalRequest[]>([]);
+  const t = useTranslations();
+  const [leaves, setLeaves] = useState<Leave[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const hasFetchedRef = useRef(false);
 
-  const fetchLeaveRequests = useCallback(async (employeeId?: string | null) => {
+  useEffect(() => {
+    if (hasFetchedRef.current) return;
+    
+    const fetchCurrentEmployeeLeaves = async () => {
+      hasFetchedRef.current = true;
     setIsLoading(true);
     try {
-      // If we have employee ID, filter by it, otherwise fetch all leave requests
-      const params: { requestType: "leave"; requestedBy?: string } = {
-        requestType: "leave",
-      };
-      
-      if (employeeId) {
-        params.requestedBy = employeeId;
-      }
-      
-      const response = await approvalsApi.getApprovals(params);
-      setLeaveRequests(response.response);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
+        const employeeResponse = await employeesApi.getCurrentEmployee();
+        const employeeId = employeeResponse.response.id;
+        const companyId = employeeResponse.response.companyId;
+
+        // Fetch leave requests for current employee
+        const response = await leavesApi.getLeavesByEmployee(employeeId, {
+          companyId,
+        });
+        setLeaves(response.response);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error && "response" in error
+            ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header
+                ?.responseMessage
         : undefined;
       addToast({
         title: "Error",
         description: errorMessage || "Failed to fetch leave requests",
         variant: "error",
       });
-      setLeaveRequests([]);
+        setLeaves([]);
     } finally {
       setIsLoading(false);
     }
-  }, [addToast]);
-
-  useEffect(() => {
-    const fetchCurrentEmployee = async () => {
-      try {
-        const response = await employeesApi.getCurrentEmployee();
-        // Fetch leave requests with employee ID
-        fetchLeaveRequests(response.response.id);
-      } catch (error) {
-        // Silently fail - endpoint may not exist, we'll fetch all leave requests instead
-        console.warn("Could not fetch current employee, fetching all leave requests:", error);
-        // Fetch all leave requests without filtering
-        fetchLeaveRequests(null);
-      }
     };
-    fetchCurrentEmployee();
+    fetchCurrentEmployeeLeaves();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -105,7 +98,7 @@ export default function MyLeaveRequestsPage() {
         <CardContent>
           {isLoading ? (
             <SkeletonTable />
-          ) : leaveRequests.length > 0 ? (
+          ) : leaves.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -118,32 +111,31 @@ export default function MyLeaveRequestsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leaveRequests.map((request, index) => (
+                  {leaves.map((leave, index) => (
                     <motion.tr
-                      key={request.id}
+                      key={leave.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/dashboard/leave/${leave.id}`)}
                     >
-                      <td className="py-4 px-4 text-gray-900 dark:text-gray-100">
-                        {(request.requestData?.leaveType as string) || "Leave"}
+                      <td className="py-4 px-4 text-gray-900 dark:text-gray-100 capitalize">
+                        {leave.leaveType}
                       </td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                        {request.requestData?.startDate && request.requestData?.endDate
-                          ? `${new Date(request.requestData.startDate as string).toLocaleDateString()} - ${new Date(request.requestData.endDate as string).toLocaleDateString()}`
-                          : "-"}
+                        {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}
                       </td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                        {(request.requestData?.reason as string) || "-"}
+                        {leave.reason || "-"}
                       </td>
                       <td className="py-4 px-4">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(request.status)}`}>
-                          {request.status}
+                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(leave.status)}`}>
+                          {leave.status}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                        {new Date(request.createdAt).toLocaleDateString()}
+                        {new Date(leave.createdAt).toLocaleDateString()}
                       </td>
                     </motion.tr>
                   ))}
@@ -153,10 +145,10 @@ export default function MyLeaveRequestsPage() {
           ) : (
             <EmptyState
               icon={Calendar}
-              title="No leave requests found"
-              description="Get started by creating a new leave request"
+              title={t.leave.noLeaveRequestsFound}
+              description={t.leave.getStartedByCreating}
               action={{
-                label: "Request Leave",
+                label: t.leave.requestLeave,
                 onClick: () => router.push("/dashboard/leave/create"),
               }}
             />

@@ -12,6 +12,8 @@ import { Role } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslations } from "@/lib/hooks/use-translations";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,11 +34,14 @@ const getHierarchyLevelColor = (level: number): string => {
 export default function RolesPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const t = useTranslations();
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSystemRole, setFilterSystemRole] = useState<boolean | undefined>(undefined);
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<{ id: string; isSystemRole: boolean } | null>(null);
 
   const fetchRoles = useCallback(async () => {
     setIsLoading(true);
@@ -51,46 +56,52 @@ export default function RolesPage() {
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to fetch roles",
+        title: t.toast.error,
+        description: errorMessage || t.roles.failedToFetchRoles,
         variant: "error",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [filterSystemRole, filterActive, addToast]);
+  }, [filterSystemRole, filterActive, addToast, t.roles.failedToFetchRoles, t.toast.error]);
 
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
 
-  const handleDelete = async (id: string, isSystemRole: boolean) => {
+  const handleDeleteClick = (id: string, isSystemRole: boolean) => {
     if (isSystemRole) {
       addToast({
-        title: "Error",
-        description: "System roles cannot be deleted",
+        title: t.toast.error,
+        description: t.roles.systemRolesCannotBeDeleted,
         variant: "error",
       });
       return;
     }
+    setRoleToDelete({ id, isSystemRole });
+    setDeleteDialogOpen(true);
+  };
 
-    if (!confirm("Are you sure you want to delete this role?")) return;
+  const handleDeleteConfirm = async () => {
+    if (!roleToDelete) return;
 
     try {
-      await rolesApi.deleteRole(id);
+      await rolesApi.deleteRole(roleToDelete.id);
       addToast({
-        title: "Success",
-        description: "Role deleted successfully",
+        title: t.toast.success,
+        description: t.roles.roleDeleted,
         variant: "success",
       });
       fetchRoles();
+      setDeleteDialogOpen(false);
+      setRoleToDelete(null);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
         ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to delete role",
+        title: t.toast.error,
+        description: errorMessage || t.roles.failedToDeleteRole,
         variant: "error",
       });
     }
@@ -114,13 +125,13 @@ export default function RolesPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Roles</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage system and custom roles</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.roles.title}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.roles.description}</p>
         </div>
         <Link href="/dashboard/roles/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Role
+            {t.roles.addRole}
           </Button>
         </Link>
       </motion.div>
@@ -132,7 +143,7 @@ export default function RolesPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search roles..."
+                placeholder={t.roles.searchRoles}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -147,9 +158,9 @@ export default function RolesPage() {
                 }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
               >
-                <option value="all">All Roles</option>
-                <option value="system">System Roles</option>
-                <option value="custom">Custom Roles</option>
+                <option value="all">{t.roles.allRoles}</option>
+                <option value="system">{t.roles.systemRoles}</option>
+                <option value="custom">{t.roles.customRoles}</option>
               </select>
               <select
                 value={filterActive === undefined ? "all" : filterActive ? "active" : "inactive"}
@@ -159,14 +170,14 @@ export default function RolesPage() {
                 }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="all">{t.roles.allStatus}</option>
+                <option value="active">{t.roles.active}</option>
+                <option value="inactive">{t.roles.inactive}</option>
               </select>
             </div>
             <Button onClick={fetchRoles} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              {t.common.refresh}
             </Button>
           </div>
         </CardHeader>
@@ -178,12 +189,12 @@ export default function RolesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Role</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Key</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[80px]">Level</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.roles.role}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.roles.key}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[80px]">{t.roles.level}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.roles.type}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.roles.status}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -212,17 +223,17 @@ export default function RolesPage() {
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
                         <Badge className={`${getHierarchyLevelColor(role.hierarchyLevel)} whitespace-nowrap`}>
-                          Level {role.hierarchyLevel}
+                          {t.roles.level} {role.hierarchyLevel}
                         </Badge>
                       </td>
                       <td className="py-4 px-4">
                         {role.isSystemRole ? (
                           <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                            System
+                            {t.roles.system}
                           </Badge>
                         ) : (
                           <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300">
-                            Custom
+                            {t.roles.custom}
                           </Badge>
                         )}
                       </td>
@@ -234,7 +245,7 @@ export default function RolesPage() {
                               : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                           }
                         >
-                          {role.isActive ? "Active" : "Inactive"}
+                          {role.isActive ? t.roles.active : t.roles.inactive}
                         </Badge>
                       </td>
                       <td className="py-4 px-4">
@@ -248,7 +259,7 @@ export default function RolesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDelete(role.id, role.isSystemRole)}
+                              onClick={() => handleDeleteClick(role.id, role.isSystemRole)}
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -263,12 +274,12 @@ export default function RolesPage() {
           ) : (
             <EmptyState
               icon={Shield}
-              title="No roles found"
-              description={searchTerm ? "Try a different search term" : "Get started by creating a new role"}
+              title={t.roles.noRolesFound}
+              description={searchTerm ? t.roles.tryDifferentSearch : t.roles.getStartedByCreating}
               action={
                 !searchTerm
                   ? {
-                      label: "Add Role",
+                      label: t.roles.addRole,
                       onClick: () => router.push("/dashboard/roles/new"),
                     }
                   : undefined
@@ -277,6 +288,19 @@ export default function RolesPage() {
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title={t.dialog.deleteRole.title}
+        message={t.dialog.deleteRole.message}
+        confirmText={t.common.delete}
+        cancelText={t.common.cancel}
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setRoleToDelete(null);
+        }}
+      />
     </div>
   );
 }

@@ -104,7 +104,7 @@ export function Sidebar() {
         if (isNetworkError) {
           console.warn("Menu API unavailable - API server may not be running. Using empty menu.");
         } else {
-          console.error("Failed to fetch menu:", error);
+        console.error("Failed to fetch menu:", error);
         }
         // Fallback to empty menu or default menu
         setMenuItems([]);

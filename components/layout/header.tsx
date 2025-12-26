@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Bell, User, Settings, LogOut } from "lucide-react";
+import { Bell, User, Settings, LogOut, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Dropdown, DropdownItem, DropdownDivider, DropdownHeader } from "@/components/ui/dropdown";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { Notification } from "@/lib/types";
 import { GlobalSearch } from "./global-search";
+import { useTranslations, useLanguage } from "@/lib/hooks/use-translations";
+import { Language } from "@/lib/i18n";
 
 const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
@@ -25,6 +27,9 @@ export function Header() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [notifications] = useState<Notification[]>([]);
+  const t = useTranslations();
+  const { language, changeLanguage } = useLanguage();
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -32,6 +37,14 @@ export function Header() {
     logout();
     router.push("/login");
   };
+
+  const languages: { code: Language; label: string }[] = [
+    { code: "en", label: t.language.english },
+    { code: "es", label: t.language.spanish },
+    { code: "fr", label: t.language.french },
+    { code: "de", label: t.language.german },
+    { code: "hi", label: t.language.hindi },
+  ];
 
   return (
     <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
@@ -133,20 +146,62 @@ export function Header() {
             <DropdownItem onClick={() => router.push("/dashboard/profile")}>
               <div className="flex items-center gap-3">
                 <User className="h-4 w-4" />
-                <span>Profile</span>
+                <span>{t.common.profile}</span>
               </div>
             </DropdownItem>
             <DropdownItem onClick={() => router.push("/dashboard/settings")}>
               <div className="flex items-center gap-3">
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>{t.common.settings || "Settings"}</span>
               </div>
             </DropdownItem>
+            <DropdownDivider />
+            <div className="relative">
+              <DropdownItem
+                onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                className="cursor-pointer"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-4 w-4" />
+                    <span>{t.language.title}</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    {language}
+                  </span>
+                </div>
+              </DropdownItem>
+              {isLanguageDropdownOpen && (
+                <div className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                  {languages.map((lang) => (
+                    <DropdownItem
+                      key={lang.code}
+                      onClick={() => {
+                        changeLanguage(lang.code);
+                        setIsLanguageDropdownOpen(false);
+                      }}
+                      className={`cursor-pointer ${
+                        language === lang.code
+                          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full pl-7">
+                        <span>{lang.label}</span>
+                        {language === lang.code && (
+                          <span className="text-blue-600 dark:text-blue-400">✓</span>
+                        )}
+                      </div>
+                    </DropdownItem>
+                  ))}
+                </div>
+              )}
+            </div>
             <DropdownDivider />
             <DropdownItem onClick={handleLogout} danger>
               <div className="flex items-center gap-3">
                 <LogOut className="h-4 w-4" />
-                <span>Logout</span>
+                <span>{t.common.logout || "Logout"}</span>
               </div>
             </DropdownItem>
           </Dropdown>
