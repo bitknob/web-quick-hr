@@ -27,30 +27,30 @@ import { useTranslations } from "@/lib/hooks/use-translations";
 import { getErrorMessage } from "@/lib/utils";
 import Link from "next/link";
 
-const documentTypeLabels: Record<DocumentType, string> = {
-  id_proof: "ID Proof",
-  address_proof: "Address Proof",
-  pan_card: "PAN Card",
-  aadhaar_card: "Aadhaar Card",
-  passport: "Passport",
-  driving_license: "Driving License",
-  educational_certificate: "Educational Certificate",
-  experience_certificate: "Experience Certificate",
-  offer_letter: "Offer Letter",
-  appointment_letter: "Appointment Letter",
-  relieving_letter: "Relieving Letter",
-  salary_slip: "Salary Slip",
-  bank_statement: "Bank Statement",
-  form_16: "Form 16",
-  other: "Other",
-};
+const getDocumentTypeLabels = (t: ReturnType<typeof useTranslations>): Record<DocumentType, string> => ({
+  id_proof: t.documentTypes.idProof,
+  address_proof: t.documentTypes.addressProof,
+  pan_card: t.documentTypes.panCard,
+  aadhaar_card: t.documentTypes.aadhaarCard,
+  passport: t.documentTypes.passport,
+  driving_license: t.documentTypes.drivingLicense,
+  educational_certificate: t.documentTypes.educationalCertificate,
+  experience_certificate: t.documentTypes.experienceCertificate,
+  offer_letter: t.documentTypes.offerLetter,
+  appointment_letter: t.documentTypes.appointmentLetter,
+  relieving_letter: t.documentTypes.relievingLetter,
+  salary_slip: t.documentTypes.salarySlip,
+  bank_statement: t.documentTypes.bankStatement,
+  form_16: t.documentTypes.form16,
+  other: t.documentTypes.other,
+});
 
-const documentStatusLabels: Record<DocumentStatus, string> = {
-  pending: "Pending",
-  verified: "Verified",
-  rejected: "Rejected",
-  expired: "Expired",
-};
+const getDocumentStatusLabels = (t: ReturnType<typeof useTranslations>): Record<DocumentStatus, string> => ({
+  pending: t.documentStatus.pending,
+  verified: t.documentStatus.verified,
+  rejected: t.documentStatus.rejected,
+  expired: t.documentStatus.expired,
+});
 
 export default function DocumentsPage() {
   const router = useRouter();
@@ -65,14 +65,18 @@ export default function DocumentsPage() {
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
 
+  const documentTypeLabels = getDocumentTypeLabels(t);
+  const documentStatusLabels = getDocumentStatusLabels(t);
+
   const fetchDocuments = useCallback(async () => {
+    if (!currentCompanyId) {
+      setIsLoading(false);
+      setDocuments([]);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      if (!currentCompanyId) {
-        setIsLoading(false);
-        return;
-      }
-
       const params: {
         documentType?: DocumentType;
         status?: DocumentStatus;
@@ -86,33 +90,44 @@ export default function DocumentsPage() {
       }
 
       const response = await documentsApi.getDocumentsByCompany(currentCompanyId, params);
-      setDocuments(response.response);
+      setDocuments(response.response || []);
     } catch (error: unknown) {
+      console.error("Failed to fetch documents:", error);
       addToast({
         title: t.toast.error,
-        description: getErrorMessage(error),
+        description: getErrorMessage(error) || t.documents.failedToFetchDocuments,
         variant: "error",
       });
       setDocuments([]);
     } finally {
       setIsLoading(false);
     }
-  }, [currentCompanyId, documentTypeFilter, statusFilter, addToast, t.toast.error]);
+  }, [currentCompanyId, documentTypeFilter, statusFilter, addToast, t.toast.error, t.documents.failedToFetchDocuments]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
     
     const fetchCurrentEmployee = async () => {
       hasFetchedRef.current = true;
+      setIsLoading(true);
       try {
         const response = await employeesApi.getCurrentEmployee();
         const companyId = response.response.companyId;
-        setCurrentCompanyId(companyId);
+        if (companyId) {
+          setCurrentCompanyId(companyId);
+        } else {
+          setIsLoading(false);
+          addToast({
+            title: t.toast.error,
+            description: t.errors.failedToFetchCompanyInfo,
+            variant: "error",
+          });
+        }
       } catch {
         setIsLoading(false);
         addToast({
-          title: "Error",
-          description: "Failed to fetch company information",
+          title: t.toast.error,
+          description: t.errors.failedToFetchCompanyInfo,
           variant: "error",
         });
       }
@@ -141,7 +156,7 @@ export default function DocumentsPage() {
       );
       setFilteredDocuments(filtered);
     }
-  }, [searchTerm, documents]);
+  }, [searchTerm, documents, documentTypeLabels]);
 
   const getStatusColor = (status: DocumentStatus) => {
     switch (status) {
@@ -273,9 +288,9 @@ export default function DocumentsPage() {
                 className="w-full md:w-48"
               >
                 <option value="all">{t.documents.allTypes}</option>
-                {Object.entries(documentTypeLabels).map(([value, label]) => (
+                {(Object.keys(documentTypeLabels) as DocumentType[]).map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {documentTypeLabels[value]}
                   </option>
                 ))}
               </Select>
@@ -285,9 +300,9 @@ export default function DocumentsPage() {
                 className="w-full md:w-40"
               >
                 <option value="all">{t.documents.allStatus}</option>
-                {Object.entries(documentStatusLabels).map(([value, label]) => (
+                {(Object.keys(documentStatusLabels) as DocumentStatus[]).map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {documentStatusLabels[value]}
                   </option>
                 ))}
               </Select>
@@ -312,14 +327,14 @@ export default function DocumentsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Employee</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Document Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">File Size</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Expiry Date</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Uploaded</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.employee}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.documentName}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.type}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.status}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.fileSize}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.expiryDate}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.uploaded}</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>

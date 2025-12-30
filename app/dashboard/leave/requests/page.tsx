@@ -46,8 +46,8 @@ export default function MyLeaveRequestsPage() {
                 ?.responseMessage
         : undefined;
       addToast({
-        title: "Error",
-        description: errorMessage || "Failed to fetch leave requests",
+        title: t.toast.error,
+        description: errorMessage || t.leave.failedToFetchLeaves,
         variant: "error",
       });
         setLeaves([]);
@@ -80,20 +80,20 @@ export default function MyLeaveRequestsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">My Leave Requests</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">View your leave request history</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.leave.myLeaveRequests}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.leave.viewLeaveRequestHistory}</p>
         </div>
         <Link href="/dashboard/leave/create">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Request Leave
+            {t.leave.requestLeave}
           </Button>
         </Link>
       </motion.div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Leave Requests</CardTitle>
+          <CardTitle>{t.leave.leaveRequests}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -103,11 +103,11 @@ export default function MyLeaveRequestsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Period</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Reason</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Created</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.leave.type}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.leave.period}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.leave.reason}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.leave.status}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.leave.created}</th>
                   </tr>
                 </thead>
                 <tbody>

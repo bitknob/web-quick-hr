@@ -18,7 +18,7 @@ export function Pagination({
   onPageChange,
   className,
 }: PaginationProps) {
-  const pages = [];
+  const pages: (number | string)[] = [];
   const maxVisible = 5;
 
   let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
