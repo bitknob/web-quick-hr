@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
@@ -19,13 +19,15 @@ const signupSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
   phoneNumber: z.string().optional(),
-  role: z.string().default("employee"),
-}).refine((data) => data.password === data.confirmPassword, {
+  role: z.string(),
+});
+
+const refinedSignupSchema = signupSchema.refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
-type SignupFormData = z.infer<typeof signupSchema>;
+type SignupFormData = z.infer<typeof refinedSignupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
@@ -37,13 +39,17 @@ export default function SignupPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(refinedSignupSchema),
     defaultValues: {
+      email: "",
+      password: "",
+      confirmPassword: "",
+      phoneNumber: "",
       role: "employee",
     },
   });
 
-  const onSubmit = async (data: SignupFormData) => {
+  const onSubmit: SubmitHandler<SignupFormData> = async (data) => {
     setIsLoading(true);
     try {
       await authApi.signup({

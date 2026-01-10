@@ -64,5 +64,4 @@ export function getTranslations(lang?: Language): Translations {
   return translation;
 }
 
-export { translations };
-
+export { translations, type Language, type Translations };
