@@ -57,7 +57,7 @@ export default function ApprovalRequestCard({ approval }: ApprovalRequestCardPro
             {approval.status === 'pending' && (
               <>
                 <Button variant="default" size="sm" className="w-full bg-green-600 hover:bg-green-700">Approve</Button>
-                <Button variant="error" size="sm" className="w-full">Reject</Button>
+                <Button variant="destructive" size="sm" className="w-full">Reject</Button>
               </>
             )}
           </div>

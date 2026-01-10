@@ -33,12 +33,9 @@ export default function ApprovalsPage({
           requestType: requestTypeFilter,
         });
         
-        if (response.success) {
-          setApprovals(response.response);
-          setError(null);
-        } else {
-          throw new Error(response.message || "Failed to fetch approvals");
-        }
+        // ApiResponse structure: { header: { responseCode, responseMessage }, response: T }
+        setApprovals(response.response);
+        setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch approvals");
         setApprovals([]);

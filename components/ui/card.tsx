@@ -1,8 +1,12 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, HTMLMotionProps } from "framer-motion";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+interface CardProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "transition"> {
+  className?: string;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, ...props }, ref) => (
     <motion.div
       ref={ref}

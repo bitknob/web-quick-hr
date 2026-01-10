@@ -9,7 +9,7 @@ export interface Toast {
   id: string;
   title?: string;
   description?: string;
-  variant?: "default" | "success" | "error" | "warning";
+  variant?: "default" | "success" | "error" | "warning" | "info";
 }
 
 interface ToastContextType {
@@ -71,6 +71,7 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast:
                 "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800": toast.variant === "success",
                 "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800": toast.variant === "error",
                 "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800": toast.variant === "warning",
+                "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800": toast.variant === "info",
               }
             )}
           >
@@ -82,6 +83,7 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast:
                     "text-green-900 dark:text-green-100": toast.variant === "success",
                     "text-red-900 dark:text-red-100": toast.variant === "error",
                     "text-yellow-900 dark:text-yellow-100": toast.variant === "warning",
+                    "text-blue-900 dark:text-blue-100": toast.variant === "info",
                   })}
                 >
                   {toast.title}
@@ -94,6 +96,7 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast:
                     "text-green-700 dark:text-green-300": toast.variant === "success",
                     "text-red-700 dark:text-red-300": toast.variant === "error",
                     "text-yellow-700 dark:text-yellow-300": toast.variant === "warning",
+                    "text-blue-700 dark:text-blue-300": toast.variant === "info",
                   })}
                 >
                   {toast.description}

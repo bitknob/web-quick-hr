@@ -1,9 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+interface SkeletonProps extends Omit<HTMLMotionProps<"div">, "animate" | "transition"> {
   variant?: "text" | "circular" | "rectangular";
   animation?: "pulse" | "wave" | "none";
 }
@@ -56,7 +56,7 @@ export function Skeleton({
         animationClasses[animation],
         className
       )}
-      {...props}
+      {...(props as React.HTMLAttributes<HTMLDivElement>)}
     />
   );
 }

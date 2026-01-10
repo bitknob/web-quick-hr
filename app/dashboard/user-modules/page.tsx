@@ -178,7 +178,7 @@ export default function UserModulesPage() {
                     <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.userId}</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.module}</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.moduleName}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.userModules.status}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.status}</th>
                     <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
                   </tr>
                 </thead>
