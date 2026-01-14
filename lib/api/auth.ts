@@ -49,8 +49,16 @@ export interface ChangePasswordRequest {
 }
 
 export const authApi = {
-  signup: async (data: SignupRequest): Promise<ApiResponse<{ user: User; accessToken: string; refreshToken: string }>> => {
-    const response = await apiClient.post<{ user: User; accessToken: string; refreshToken: string }>("/api/auth/signup", data);
+  signup: async (
+    data: SignupRequest
+  ): Promise<
+    ApiResponse<{ user: User; accessToken: string; refreshToken: string }>
+  > => {
+    const response = await apiClient.post<{
+      user: User;
+      accessToken: string;
+      refreshToken: string;
+    }>("/api/auth/signup", data);
     if (response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
       apiClient.setRefreshToken(response.response.refreshToken);
@@ -59,7 +67,10 @@ export const authApi = {
   },
 
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
-    const response = await apiClient.post<LoginResponse>("/api/auth/login", data);
+    const response = await apiClient.post<LoginResponse>(
+      "/api/auth/login",
+      data
+    );
     if (response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
       apiClient.setRefreshToken(response.response.refreshToken);
@@ -79,12 +90,20 @@ export const authApi = {
     return apiClient.post("/api/auth/forgot-password", { email });
   },
 
-  resetPassword: async (token: string, newPassword: string): Promise<ApiResponse<User>> => {
+  resetPassword: async (
+    token: string,
+    newPassword: string
+  ): Promise<ApiResponse<User>> => {
     return apiClient.post("/api/auth/reset-password", { token, newPassword });
   },
 
-  refreshToken: async (refreshToken: string): Promise<ApiResponse<RefreshTokenResponse>> => {
-    const response = await apiClient.post<RefreshTokenResponse>("/api/auth/refresh-token", { refreshToken });
+  refreshToken: async (
+    refreshToken: string
+  ): Promise<ApiResponse<RefreshTokenResponse>> => {
+    const response = await apiClient.post<RefreshTokenResponse>(
+      "/api/auth/refresh-token",
+      { refreshToken }
+    );
     if (response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
       apiClient.setRefreshToken(response.response.refreshToken);
@@ -102,7 +121,9 @@ export const authApi = {
     return apiClient.postFormData("/api/auth/upload-profile-image", formData);
   },
 
-  changePassword: async (data: ChangePasswordRequest): Promise<ApiResponse<null>> => {
+  changePassword: async (
+    data: ChangePasswordRequest
+  ): Promise<ApiResponse<null>> => {
     return apiClient.post("/api/auth/change-password", data);
   },
 
@@ -117,5 +138,22 @@ export const authApi = {
       window.location.href = "/login";
     }
   },
-};
 
+  // Role Assignment APIs
+  assignRole: async (
+    userId: string,
+    role: string
+  ): Promise<ApiResponse<User>> => {
+    return apiClient.post("/api/auth/assign-role", { userId, role });
+  },
+
+  getUserRole: async (userId: string): Promise<ApiResponse<User>> => {
+    return apiClient.get(`/api/auth/users/${userId}/role`);
+  },
+
+  getUserRoleByEmail: async (email: string): Promise<ApiResponse<User>> => {
+    return apiClient.get(
+      `/api/auth/users/email/${encodeURIComponent(email)}/role`
+    );
+  },
+};

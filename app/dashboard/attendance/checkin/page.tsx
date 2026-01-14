@@ -11,6 +11,7 @@ import { employeesApi } from "@/lib/api/employees";
 import { Attendance, Employee } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getErrorMessage, formatApiErrorMessage } from "@/lib/utils";
 
 export default function CheckInPage() {
   const router = useRouter();
@@ -34,6 +35,22 @@ export default function CheckInPage() {
     setIsLoading(true);
     try {
       const employeeResponse = await employeesApi.getCurrentEmployee();
+      
+      // Check if response is null (404 case where API returns 200 with null response)
+      if (!employeeResponse.response) {
+        const errorMessage = formatApiErrorMessage(
+          employeeResponse.header.responseMessage,
+          employeeResponse.header.responseDetail
+        );
+        addToast({
+          title: "Error",
+          description: errorMessage,
+          variant: "error",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       const employee = employeeResponse.response;
       setCurrentEmployee(employee);
 
@@ -54,14 +71,10 @@ export default function CheckInPage() {
         setIsCheckedIn(false);
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error && "response" in error
-          ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header
-              ?.responseMessage
-          : undefined;
+      const errorMessage = getErrorMessage(error);
       addToast({
         title: "Error",
-        description: errorMessage || "Failed to fetch employee information",
+        description: errorMessage,
         variant: "error",
       });
     } finally {
@@ -94,14 +107,10 @@ export default function CheckInPage() {
       setIsCheckedIn(true);
       fetchEmployeeAndTodayAttendance();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error && "response" in error
-          ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header
-              ?.responseMessage
-          : undefined;
+      const errorMessage = getErrorMessage(error);
       addToast({
         title: "Error",
-        description: errorMessage || "Failed to check in",
+        description: errorMessage,
         variant: "error",
       });
     } finally {

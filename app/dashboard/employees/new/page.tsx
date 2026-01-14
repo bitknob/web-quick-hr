@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { getErrorMessage } from "@/lib/utils";
 
 const newEmployeeSchema = z.object({
   userEmail: z.string().email("Invalid email address").min(1, "User email is required"),
@@ -23,7 +24,7 @@ const newEmployeeSchema = z.object({
   employeeId: z.string().min(1, "Employee ID is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+  userCompEmail: z.string().email("Invalid email address").optional(),
   phoneNumber: z.string().optional(),
   dateOfBirth: z.string().optional(),
   address: z.string().optional(),
@@ -32,12 +33,6 @@ const newEmployeeSchema = z.object({
   managerId: z.string().optional(),
   hireDate: z.string().min(1, "Hire date is required"),
   salary: z.number().optional(),
-}).refine((data) => {
-  // User email and employee email should match or user email should be provided
-  return data.userEmail || data.email;
-}, {
-  message: "User email is required",
-  path: ["userEmail"],
 });
 
 type NewEmployeeFormData = z.infer<typeof newEmployeeSchema>;
@@ -151,16 +146,13 @@ export default function NewEmployeePage() {
   const onSubmit = async (data: NewEmployeeFormData) => {
     setIsSaving(true);
     try {
-      // Note: API expects userId (UUID), but we're collecting userEmail
-      // The backend should look up the user by email, or we need to fetch userId first
-      // For now, using userEmail as userId - backend should handle email lookup
       const response = await employeesApi.createEmployee({
-        userId: data.userEmail, // Backend should accept email or look up userId from email
+        userEmail: data.userEmail,
         companyId: data.companyId,
         employeeId: data.employeeId,
         firstName: data.firstName,
         lastName: data.lastName,
-        email: data.email,
+        userCompEmail: data.userCompEmail,
         phoneNumber: data.phoneNumber,
         dateOfBirth: data.dateOfBirth,
         address: data.address,
@@ -177,12 +169,10 @@ export default function NewEmployeePage() {
       });
       router.push(`/dashboard/employees/${response.response.id}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
-        : undefined;
+      const errorMessage = getErrorMessage(error);
       addToast({
         title: "Error",
-        description: errorMessage || "Failed to create employee",
+        description: errorMessage,
         variant: "error",
       });
     } finally {
@@ -319,18 +309,22 @@ export default function NewEmployeePage() {
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email <span className="text-red-500">*</span>
+                  <label htmlFor="userCompEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Company Email
                   </label>
                   <Input
-                    id="email"
+                    id="userCompEmail"
                     type="email"
-                    {...register("email")}
-                    className={errors.email ? "border-red-500" : ""}
+                    placeholder="employee@company.com"
+                    {...register("userCompEmail")}
+                    className={errors.userCompEmail ? "border-red-500" : ""}
                   />
-                  {errors.email && (
-                    <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                  {errors.userCompEmail && (
+                    <p className="text-sm text-red-500 mt-1">{errors.userCompEmail.message}</p>
                   )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Optional company-specific email address
+                  </p>
                 </div>
 
                 <div>

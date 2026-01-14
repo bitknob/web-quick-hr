@@ -6,13 +6,15 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCog } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
-import { Employee } from "@/lib/types";
+import { authApi } from "@/lib/api/auth";
+import { Employee, User } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { getErrorMessage, formatApiErrorMessage } from "@/lib/utils";
 
 const employeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -31,8 +33,10 @@ export default function EmployeeDetailPage() {
   const params = useParams();
   const { addToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingUser, setIsLoadingUser] = useState(false);
 
   const {
     register,
@@ -54,6 +58,23 @@ export default function EmployeeDetailPage() {
     setIsLoading(true);
     try {
       const response = await employeesApi.getEmployee(id);
+      
+      // Check if response is null (404 case where API returns 200 with null response)
+      if (!response.response) {
+        const fullMessage = formatApiErrorMessage(
+          response.header.responseMessage,
+          response.header.responseDetail
+        );
+        
+        addToast({
+          title: "Error",
+          description: fullMessage,
+          variant: "error",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       setEmployee(response.response);
       reset({
         firstName: response.response.firstName,
@@ -64,10 +85,12 @@ export default function EmployeeDetailPage() {
         department: response.response.department,
         salary: response.response.salary,
       });
+      // Fetch user role information using email
+      if (response.response.email) {
+        fetchUserRole(response.response.email);
+      }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
-        : undefined;
+      const errorMessage = getErrorMessage(error);
       addToast({
         title: "Error",
         description: errorMessage || "Failed to fetch employee",
@@ -75,6 +98,26 @@ export default function EmployeeDetailPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUserRole = async (email: string) => {
+    // Only fetch if email is provided
+    if (!email || !email.includes('@')) {
+      setIsLoadingUser(false);
+      return;
+    }
+
+    setIsLoadingUser(true);
+    try {
+      const response = await authApi.getUserRoleByEmail(email);
+      setUser(response.response);
+    } catch {
+      // Silently fail - user role is optional information
+      // This happens when the employee doesn't have a user account yet (400 error)
+      setUser(null);
+    } finally {
+      setIsLoadingUser(false);
     }
   };
 
@@ -91,9 +134,7 @@ export default function EmployeeDetailPage() {
       });
       fetchEmployee(employee.id);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
-        : undefined;
+      const errorMessage = getErrorMessage(error);
       addToast({
         title: "Error",
         description: errorMessage || "Failed to update employee",
@@ -146,10 +187,154 @@ export default function EmployeeDetailPage() {
         </div>
       </motion.div>
 
+      {/* User Role Information Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                User Role Information
+              </CardTitle>
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/dashboard/user-roles?userId=${employee.userId}&email=${encodeURIComponent(employee.email)}`)}
+                  className="gap-2"
+                >
+                  <UserCog className="h-4 w-4" />
+                  Manage User Role
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingUser ? (
+              <div className="flex items-center gap-3 py-4">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-600 dark:text-gray-400">Loading user role...</p>
+              </div>
+            ) : user ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">User ID</p>
+                    <p className="font-mono text-sm text-gray-900 dark:text-gray-100">{user.id}</p>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Role</p>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-sm font-semibold">
+                        {user.role}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email Verified</p>
+                    <div className="flex items-center gap-2">
+                      {user.isEmailVerified ? (
+                        <>
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">Verified</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">Not Verified</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Account Created</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    Click &quot;Manage User Role&quot; to assign or change this user&#39;s role in the system
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">No User Account Linked</h4>
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        This employee doesn't have a user account yet. Create a user account and assign a role to enable system access.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Next Steps
+                  </h4>
+                  <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-700 text-white flex items-center justify-center text-xs font-bold">1</span>
+                      <span>The employee should sign up using their email: <strong className="font-mono">{employee?.email}</strong></span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-700 text-white flex items-center justify-center text-xs font-bold">2</span>
+                      <span>After signup, go to <strong>User Role Management</strong> to assign their role</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-700 text-white flex items-center justify-center text-xs font-bold">3</span>
+                      <span>The employee will then be able to access the system with their assigned permissions</span>
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="default"
+                    onClick={() => router.push(`/dashboard/user-roles?email=${encodeURIComponent(employee?.email || '')}`)}
+                    className="flex-1"
+                  >
+                    <UserCog className="h-4 w-4 mr-2" />
+                    Assign User Role
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('/signup', '_blank')}
+                    className="flex-1"
+                  >
+                    <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Create User Account
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
       >
         <Card>
           <CardHeader>

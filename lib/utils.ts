@@ -28,12 +28,22 @@ export function formatDateTime(date: string | Date): string {
 export function getErrorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
     const apiError = error.response?.data as ApiError | undefined;
-    if (apiError?.header?.responseMessage) {
-      return apiError.header.responseMessage;
+    const responseMessage = apiError?.header?.responseMessage;
+    const responseDetail = apiError?.header?.responseDetail;
+
+    // Combine both message and detail if both exist
+    if (responseMessage && responseDetail) {
+      return `${responseMessage}: ${responseDetail}`;
     }
-    if (apiError?.header?.responseDetail) {
-      return apiError.header.responseDetail;
+
+    if (responseMessage) {
+      return responseMessage;
     }
+
+    if (responseDetail) {
+      return responseDetail;
+    }
+
     if (error.response?.statusText) {
       return error.response.statusText;
     }
@@ -41,15 +51,28 @@ export function getErrorMessage(error: unknown): string {
       return error.message;
     }
   }
-  
+
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   if (typeof error === "string") {
     return error;
   }
-  
+
   return "An unexpected error occurred";
 }
 
+/**
+ * Format API error message from response header
+ * Combines responseMessage and responseDetail if both exist
+ */
+export function formatApiErrorMessage(
+  responseMessage: string,
+  responseDetail?: string
+): string {
+  if (responseDetail) {
+    return `${responseMessage}: ${responseDetail}`;
+  }
+  return responseMessage;
+}
