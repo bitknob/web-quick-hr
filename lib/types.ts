@@ -21,12 +21,12 @@ export interface User {
 
 export interface Employee {
   id: string;
-  userId: string;
+  userEmail: string;
   companyId: string;
   employeeId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  userCompEmail: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   address?: string;
@@ -93,7 +93,12 @@ export type ApprovalRequestType =
   | "department_change"
   | "other";
 
-export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled" | "expired";
+export type ApprovalStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "expired";
 
 export type ApprovalPriority = "low" | "normal" | "high" | "urgent";
 
@@ -462,7 +467,12 @@ export type ReimbursementType =
   | "conveyance"
   | "other";
 
-export type ReimbursementStatus = "draft" | "submitted" | "approved" | "rejected" | "paid";
+export type ReimbursementStatus =
+  | "draft"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "paid";
 
 export interface Reimbursement {
   id: string;
@@ -502,7 +512,13 @@ export interface TaxDeclaration {
   updatedAt: string;
 }
 
-export type LeaveType = "annual" | "sick" | "casual" | "maternity" | "paternity" | "unpaid";
+export type LeaveType =
+  | "annual"
+  | "sick"
+  | "casual"
+  | "maternity"
+  | "paternity"
+  | "unpaid";
 
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
 

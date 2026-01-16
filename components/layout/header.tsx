@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Bell, User, Settings, LogOut, Globe } from "lucide-react";
+import { Bell, User, Settings, LogOut, Globe, HelpCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Dropdown, DropdownItem, DropdownDivider, DropdownHeader } from "@/components/ui/dropdown";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -153,6 +153,12 @@ export function Header() {
               <div className="flex items-center gap-3">
                 <Settings className="h-4 w-4" />
                 <span>{t.common.settings || "Settings"}</span>
+              </div>
+            </DropdownItem>
+            <DropdownItem onClick={() => router.push("/dashboard/help")}>
+              <div className="flex items-center gap-3">
+                <HelpCircle className="h-4 w-4" />
+                <span>Help</span>
               </div>
             </DropdownItem>
             <DropdownDivider />

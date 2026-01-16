@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authApi } from "@/lib/api/auth";
-import { User, UserRole } from "@/lib/types";
+import { employeesApi } from "@/lib/api/employees";
+import { User, UserRole, Employee } from "@/lib/types";
 import { getErrorMessage, formatApiErrorMessage } from "@/lib/utils";
 
 const AVAILABLE_ROLES: { value: UserRole; label: string; description: string }[] = [
@@ -23,11 +24,13 @@ const AVAILABLE_ROLES: { value: UserRole; label: string; description: string }[]
 
 export default function UserRoleManagementPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [searchType, setSearchType] = useState<"userId" | "email">("userId");
   const [searchValue, setSearchValue] = useState("");
   const [selectedRole, setSelectedRole] = useState<UserRole>("employee");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [foundUser, setFoundUser] = useState<User | null>(null);
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -38,18 +41,53 @@ export default function UserRoleManagementPage() {
     // Check for URL parameters and auto-populate
     const userId = searchParams.get("userId");
     const email = searchParams.get("email");
+    const employeeName = searchParams.get("employeeName");
+    const employeeId = searchParams.get("employeeId");
     
+    // Handle userId parameter - fetch user details directly
     if (userId) {
       setSearchType("userId");
       setSearchValue(userId);
+      
+      // If employeeId is provided, fetch full employee data from API
+      if (employeeId) {
+        fetchEmployeeData(employeeId);
+      }
+      
+      // Auto-search for user by userId (silent mode - no success message)
       setTimeout(() => {
-        handleSearchWithValue(userId, "userId");
+        handleSearchWithValue(userId, "userId", true);
       }, 500);
     } else if (email) {
       setSearchType("email");
       setSearchValue(email);
+      
+      // If we have employee info from URL params, create employee object
+      if (employeeName && employeeId) {
+        const [firstName, ...lastNameParts] = employeeName.split(' ');
+        const lastName = lastNameParts.join(' ');
+        setEmployee({
+          id: '',
+          userEmail: email,
+          companyId: '',
+          employeeId: employeeId,
+          firstName: firstName,
+          lastName: lastName,
+          userCompEmail: email,
+          phoneNumber: '',
+          jobTitle: '',
+          department: '',
+          hireDate: '',
+          status: 'active',
+          profileImageUrl: '',
+          createdAt: '',
+          updatedAt: ''
+        } as Employee);
+      }
+      
+      // Auto-search for user by email (silent mode - no success message)
       setTimeout(() => {
-        handleSearchWithValue(email, "email");
+        handleSearchWithValue(email, "email", true);
       }, 500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +102,18 @@ export default function UserRoleManagementPage() {
     }
   };
 
-  const handleSearchWithValue = async (value: string, type: "userId" | "email") => {
+  const fetchEmployeeData = async (employeeId: string) => {
+    try {
+      const response = await employeesApi.getEmployee(employeeId);
+      if (response.response) {
+        setEmployee(response.response);
+      }
+    } catch (error) {
+      console.error("Failed to load employee data:", error);
+    }
+  };
+
+  const handleSearchWithValue = async (value: string, type: "userId" | "email", silent: boolean = false) => {
     if (!value.trim()) return;
 
     setSearching(true);
@@ -85,7 +134,13 @@ export default function UserRoleManagementPage() {
           response.header.responseMessage,
           response.header.responseDetail
         );
-        setMessage({ type: "error", text: errorMessage });
+        
+        // Provide a more helpful message for email searches (common from employee detail page)
+        const helpfulMessage = type === "email" 
+          ? `${errorMessage}. The employee needs to sign up using this email address before a role can be assigned.`
+          : errorMessage;
+        
+        setMessage({ type: "error", text: helpfulMessage });
         setFoundUser(null);
         setSearching(false);
         return;
@@ -93,10 +148,19 @@ export default function UserRoleManagementPage() {
       
       setFoundUser(response.response);
       setSelectedRole(response.response.role);
-      setMessage({ type: "success", text: "User found successfully" });
+      // Only show success message if not silent (i.e., manual search)
+      if (!silent) {
+        setMessage({ type: "success", text: "User found successfully" });
+      }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      setMessage({ type: "error", text: errorMessage });
+      
+      // Provide a more helpful message for email searches
+      const helpfulMessage = type === "email" 
+        ? `${errorMessage}. The employee needs to sign up using this email address before a role can be assigned.`
+        : errorMessage;
+      
+      setMessage({ type: "error", text: helpfulMessage });
       setFoundUser(null);
     } finally {
       setSearching(false);
@@ -114,7 +178,12 @@ export default function UserRoleManagementPage() {
 
   const handleAssignRole = async () => {
     if (!foundUser) {
-      setMessage({ type: "error", text: "Please search for a user first" });
+      setMessage({ 
+        type: "error", 
+        text: employee 
+          ? `Cannot assign role: ${employee.firstName} ${employee.lastName} hasn't created a user account yet. They need to sign up first using their email: ${employee.userCompEmail}`
+          : "Please search for a user first" 
+      });
       return;
     }
 
@@ -162,9 +231,24 @@ export default function UserRoleManagementPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4"
       >
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">User Role Management</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Assign and manage user roles across the system</p>
+        {/* Show back button if coming from employee details */}
+        {(searchParams.get("userId") || searchParams.get("email")) && (
+          <Button 
+            variant="ghost" 
+            onClick={() => router.back()}
+          >
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </Button>
+        )}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">User Role Management</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Assign and manage user roles across the system</p>
+        </div>
       </motion.div>
 
       {/* Permission Check */}
@@ -190,7 +274,7 @@ export default function UserRoleManagementPage() {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Search User Card */}
+        {/* Employee Details or Search User Card */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -199,96 +283,221 @@ export default function UserRoleManagementPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Search User
+                {employee ? (
+                  <>
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Employee Details
+                  </>
+                ) : searchParams.get("userId") && foundUser ? (
+                  <>
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    User Details
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search User
+                  </>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Search Type Selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search By</label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={searchType === "userId" ? "default" : "outline"}
-                    onClick={() => setSearchType("userId")}
-                    className="flex-1"
-                  >
-                    User ID
-                  </Button>
-                  <Button
-                    variant={searchType === "email" ? "default" : "outline"}
-                    onClick={() => setSearchType("email")}
-                    className="flex-1"
-                  >
-                    Email
-                  </Button>
-                </div>
-              </div>
-
-              {/* Search Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {searchType === "userId" ? "User ID" : "Email Address"}
-                </label>
-                <Input
-                  type={searchType === "email" ? "email" : "text"}
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  placeholder={searchType === "userId" ? "Enter user UUID" : "user@example.com"}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                />
-              </div>
-
-              {/* Search Button */}
-              <Button
-                onClick={handleSearch}
-                disabled={searching || !canAssignRoles}
-                className="w-full"
-                isLoading={searching}
-              >
-                {searching ? "Searching..." : "Search User"}
-              </Button>
-
-              {/* Found User Display */}
-              {foundUser && (
-                <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    User Found
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">ID:</span>
-                      <span className="font-mono text-gray-900 dark:text-gray-100 text-xs break-all">{foundUser.id}</span>
+              {employee ? (
+                /* Employee Details View */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Employee Name</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">
+                        {employee.firstName} {employee.lastName}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Email:</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100">{foundUser.email}</span>
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Employee ID</p>
+                      <p className="font-mono text-sm text-gray-900 dark:text-gray-100">{employee.employeeId}</p>
                     </div>
-                    {foundUser.phoneNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Phone:</span>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{foundUser.phoneNumber}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Current Role:</span>
-                      <span className="px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-xs font-semibold">
-                        {foundUser.role}
-                      </span>
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email</p>
+                      <p className="text-sm text-gray-900 dark:text-gray-100">{employee.userCompEmail}</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Email Verified:</span>
-                      <span className={`font-medium ${foundUser.isEmailVerified ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                        {foundUser.isEmailVerified ? "Yes" : "No"}
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Department</p>
+                      <p className="text-sm text-gray-900 dark:text-gray-100">{employee.department}</p>
+                    </div>
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Job Title</p>
+                      <p className="text-sm text-gray-900 dark:text-gray-100">{employee.jobTitle}</p>
+                    </div>
+                    <div className="rounded-lg p-4 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Status</p>
+                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                        employee.status === 'active' 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' 
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                      }`}>
+                        {employee.status}
                       </span>
                     </div>
                   </div>
                 </div>
+              ) : searchParams.get("userId") && foundUser ? (
+                /* User Details View (when userId is in URL) */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      User Details
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">User ID</p>
+                          <p className="font-mono text-xs text-gray-900 dark:text-gray-100 break-all">{foundUser.id}</p>
+                        </div>
+                        <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Email</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{foundUser.email}</p>
+                        </div>
+                        {foundUser.phoneNumber && (
+                          <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Phone</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{foundUser.phoneNumber}</p>
+                          </div>
+                        )}
+                        <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Current Role</p>
+                          <span className="inline-flex px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-xs font-semibold">
+                            {foundUser.role}
+                          </span>
+                        </div>
+                        <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Email Verified</p>
+                          <span className={`inline-flex items-center gap-1 font-medium text-sm ${foundUser.isEmailVerified ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {foundUser.isEmailVerified ? (
+                              <>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                Yes
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                No
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Search User View */
+                <>
+                  {/* Search Type Selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search By</label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={searchType === "userId" ? "default" : "outline"}
+                        onClick={() => {
+                          setSearchType("userId");
+                          setMessage(null);
+                          setFoundUser(null);
+                        }}
+                        className="flex-1"
+                      >
+                        User ID
+                      </Button>
+                      <Button
+                        variant={searchType === "email" ? "default" : "outline"}
+                        onClick={() => {
+                          setSearchType("email");
+                          setMessage(null);
+                          setFoundUser(null);
+                        }}
+                        className="flex-1"
+                      >
+                        Email
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Search Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {searchType === "userId" ? "User ID" : "Email Address"}
+                    </label>
+                    <Input
+                      type={searchType === "email" ? "email" : "text"}
+                      value={searchValue}
+                      onChange={(e) => setSearchValue(e.target.value)}
+                      placeholder={searchType === "userId" ? "Enter user UUID" : "user@example.com"}
+                      onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                    />
+                  </div>
+
+                  {/* Search Button */}
+                  <Button
+                    onClick={handleSearch}
+                    disabled={searching || !canAssignRoles}
+                    className="w-full"
+                    isLoading={searching}
+                  >
+                    {searching ? "Searching..." : "Search User"}
+                  </Button>
+
+                  {/* Found User Display */}
+                  {foundUser && (
+                    <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        User Found
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">ID:</span>
+                          <span className="font-mono text-gray-900 dark:text-gray-100 text-xs break-all">{foundUser.id}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Email:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{foundUser.email}</span>
+                        </div>
+                        {foundUser.phoneNumber && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Phone:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{foundUser.phoneNumber}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600 dark:text-gray-400">Current Role:</span>
+                          <span className="px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-xs font-semibold">
+                            {foundUser.role}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Email Verified:</span>
+                          <span className={`font-medium ${foundUser.isEmailVerified ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {foundUser.isEmailVerified ? "Yes" : "No"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -354,7 +563,7 @@ export default function UserRoleManagementPage() {
 
               <Button
                 onClick={handleAssignRole}
-                disabled={loading || !foundUser || !canAssignRoles}
+                disabled={loading || !canAssignRoles}
                 className="w-full"
                 isLoading={loading}
               >
@@ -366,7 +575,7 @@ export default function UserRoleManagementPage() {
       </div>
 
       {/* Message Display */}
-      {message && (
+      {message && !(employee && message.type === "error" && message.text.includes("search for a user")) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

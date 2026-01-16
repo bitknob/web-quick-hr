@@ -79,15 +79,15 @@ export default function EmployeeDetailPage() {
       reset({
         firstName: response.response.firstName,
         lastName: response.response.lastName,
-        email: response.response.email,
+        email: response.response.userCompEmail,
         phoneNumber: response.response.phoneNumber || "",
         jobTitle: response.response.jobTitle,
         department: response.response.department,
         salary: response.response.salary,
       });
       // Fetch user role information using email
-      if (response.response.email) {
-        fetchUserRole(response.response.email);
+      if (response.response.userCompEmail) {
+        fetchUserRole(response.response.userCompEmail);
       }
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -204,7 +204,7 @@ export default function EmployeeDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/dashboard/user-roles?userId=${employee.userId}&email=${encodeURIComponent(employee.email)}`)}
+                  onClick={() => router.push(`/dashboard/user-roles?userId=${user.id}&employeeId=${employee.id}`)}
                   className="gap-2"
                 >
                   <UserCog className="h-4 w-4" />
@@ -292,7 +292,7 @@ export default function EmployeeDetailPage() {
                   <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
                     <li className="flex items-start gap-2">
                       <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-700 text-white flex items-center justify-center text-xs font-bold">1</span>
-                      <span>The employee should sign up using their email: <strong className="font-mono">{employee?.email}</strong></span>
+                      <span>The employee should sign up using their email: <strong className="font-mono">{employee.userCompEmail}</strong></span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-700 text-white flex items-center justify-center text-xs font-bold">2</span>
@@ -305,26 +305,13 @@ export default function EmployeeDetailPage() {
                   </ol>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button
-                    variant="default"
-                    onClick={() => router.push(`/dashboard/user-roles?email=${encodeURIComponent(employee?.email || '')}`)}
-                    className="flex-1"
-                  >
-                    <UserCog className="h-4 w-4 mr-2" />
-                    Assign User Role
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open('/signup', '_blank')}
-                    className="flex-1"
-                  >
-                    <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                    </svg>
-                    Create User Account
-                  </Button>
-                </div>
+                <Button
+                  variant="default"
+                  onClick={() => router.push(`/dashboard/user-roles?email=${encodeURIComponent(employee.userCompEmail)}&employeeName=${encodeURIComponent(`${employee.firstName} ${employee.lastName}`)}&employeeId=${encodeURIComponent(employee.employeeId)}`)}
+                >
+                  <UserCog className="h-4 w-4 mr-2" />
+                  Assign User Role
+                </Button>
               </div>
             )}
           </CardContent>
