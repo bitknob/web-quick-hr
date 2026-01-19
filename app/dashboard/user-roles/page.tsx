@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { authApi } from "@/lib/api/auth";
 import { employeesApi } from "@/lib/api/employees";
 import { User, UserRole, Employee } from "@/lib/types";
-import { getErrorMessage, formatApiErrorMessage } from "@/lib/utils";
+import { getErrorMessage, formatApiErrorMessage, formatRole } from "@/lib/utils";
 
 const AVAILABLE_ROLES: { value: UserRole; label: string; description: string }[] = [
   { value: "super_admin", label: "Super Admin", description: "Full system access" },
@@ -236,7 +236,8 @@ export default function UserRoleManagementPage() {
         {/* Show back button if coming from employee details */}
         {(searchParams.get("userId") || searchParams.get("email")) && (
           <Button 
-            variant="ghost" 
+            variant="outline" 
+            size="sm"
             onClick={() => router.back()}
           >
             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -375,7 +376,7 @@ export default function UserRoleManagementPage() {
                         <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Current Role</p>
                           <span className="inline-flex px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-xs font-semibold">
-                            {foundUser.role}
+                            {formatRole(foundUser.role)}
                           </span>
                         </div>
                         <div className="rounded-lg p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
@@ -485,7 +486,7 @@ export default function UserRoleManagementPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600 dark:text-gray-400">Current Role:</span>
                           <span className="px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-xs font-semibold">
-                            {foundUser.role}
+                            {formatRole(foundUser.role)}
                           </span>
                         </div>
                         <div className="flex justify-between">

@@ -1,7 +1,15 @@
-import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9400";
-const API_LOG_ENABLED = process.env.NEXT_PUBLIC_API_LOG_ENABLED === "true" || process.env.NEXT_PUBLIC_API_LOG_ENABLED === "1";
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:9400";
+const API_LOG_ENABLED =
+  process.env.NEXT_PUBLIC_API_LOG_ENABLED === "true" ||
+  process.env.NEXT_PUBLIC_API_LOG_ENABLED === "1";
 
 export interface ApiResponse<T> {
   header: {
@@ -42,7 +50,7 @@ class ApiClient {
       },
       (error) => {
         return Promise.reject(error);
-      }
+      },
     );
 
     this.client.interceptors.response.use(
@@ -61,11 +69,12 @@ class ApiClient {
           const currentPath = window.location.pathname;
           // Only redirect if not already on authentication-related pages
           // This prevents redirect loops and unnecessary page refreshes
-          const isAuthPage = currentPath.includes("/login") || 
-                            currentPath.includes("/signup") || 
-                            currentPath.includes("/forgot-password") ||
-                            currentPath.includes("/reset-password");
-          
+          const isAuthPage =
+            currentPath.includes("/login") ||
+            currentPath.includes("/signup") ||
+            currentPath.includes("/forgot-password") ||
+            currentPath.includes("/reset-password");
+
           if (!isAuthPage) {
             this.clearToken();
             // Use window.location.href for 401 errors as they indicate auth is required
@@ -76,7 +85,7 @@ class ApiClient {
         // For all other errors, reject the promise so components can handle them
         // This prevents any page refresh - errors are caught in try/catch blocks
         return Promise.reject(error);
-      }
+      },
     );
   }
 
@@ -84,7 +93,7 @@ class ApiClient {
     const method = (config.method || "GET").toUpperCase();
     const url = config.url ? `${API_BASE_URL}${config.url}` : "";
     const headers: string[] = [];
-    
+
     if (config.headers) {
       Object.entries(config.headers).forEach(([key, value]) => {
         if (value && typeof value === "string" && key !== "Content-Length") {
@@ -94,15 +103,16 @@ class ApiClient {
     }
 
     let curlCommand = `curl -X ${method} "${url}"`;
-    
+
     if (headers.length > 0) {
       curlCommand += ` \\\n  ${headers.join(" \\\n  ")}`;
     }
 
     if (config.data && method !== "GET" && method !== "DELETE") {
-      const dataStr = typeof config.data === "string" 
-        ? config.data 
-        : JSON.stringify(config.data, null, 2);
+      const dataStr =
+        typeof config.data === "string"
+          ? config.data
+          : JSON.stringify(config.data, null, 2);
       curlCommand += ` \\\n  -d '${dataStr.replace(/'/g, "'\\''")}'`;
     }
 
@@ -111,10 +121,10 @@ class ApiClient {
 
   private logResponse(response: AxiosResponse<unknown>): void {
     if (!API_LOG_ENABLED) return;
-    
+
     const config = response.config as InternalAxiosRequestConfig;
     const curlCommand = this.generateCurlCommand(config);
-    
+
     // Always log to terminal (works in both server and client via console.log)
     const logData = {
       type: "API Response",
@@ -134,7 +144,7 @@ class ApiClient {
         data: response.data,
       },
     };
-    
+
     // Terminal logging (plain text format)
     console.log("\n" + "=".repeat(80));
     console.log(`API Response: ${config.method?.toUpperCase()} ${config.url}`);
@@ -146,10 +156,13 @@ class ApiClient {
     console.log("\nResponse Details:");
     console.log(JSON.stringify(logData.response, null, 2));
     console.log("=".repeat(80) + "\n");
-    
+
     // Browser console logging (only if in browser)
     if (typeof window !== "undefined") {
-      console.group(`%cAPI Response: ${config.method?.toUpperCase()} ${config.url}`, "color: #10b981; font-weight: bold");
+      console.group(
+        `%cAPI Response: ${config.method?.toUpperCase()} ${config.url}`,
+        "color: #10b981; font-weight: bold",
+      );
       console.log("%ccURL Command:", "color: #3b82f6; font-weight: bold");
       console.log(curlCommand);
       console.log("%cRequest Details:", "color: #f59e0b; font-weight: bold");
@@ -163,23 +176,23 @@ class ApiClient {
   private logErrorResponse(error: AxiosError<ApiError>): void {
     const config = error.config as InternalAxiosRequestConfig;
     if (!config) return;
-    
+
     // Check if it's a network error (no response)
     const isNetworkError = !error.response && error.message === "Network Error";
-    
+
     if (isNetworkError) {
       // Always log network errors (they're important to know about)
       console.warn(
         `\n⚠️  Network Error: Cannot connect to API server at ${API_BASE_URL}${config.url}\n` +
-        `Make sure the API server is running and accessible.\n`
+          `Make sure the API server is running and accessible.\n`,
       );
       return;
     }
-    
+
     if (!API_LOG_ENABLED) return;
-    
+
     const curlCommand = this.generateCurlCommand(config);
-    
+
     // Always log to terminal (works in both server and client via console.log)
     const logData = {
       type: "API Error",
@@ -200,7 +213,7 @@ class ApiClient {
         message: error.message,
       },
     };
-    
+
     // Terminal logging (plain text format)
     console.log("\n" + "=".repeat(80));
     console.log(`API Error: ${config.method?.toUpperCase()} ${config.url}`);
@@ -212,10 +225,13 @@ class ApiClient {
     console.log("\nError Details:");
     console.log(JSON.stringify(logData.error, null, 2));
     console.log("=".repeat(80) + "\n");
-    
+
     // Browser console logging (only if in browser)
     if (typeof window !== "undefined") {
-      console.group(`%cAPI Error: ${config.method?.toUpperCase()} ${config.url}`, "color: #ef4444; font-weight: bold");
+      console.group(
+        `%cAPI Error: ${config.method?.toUpperCase()} ${config.url}`,
+        "color: #ef4444; font-weight: bold",
+      );
       console.log("%ccURL Command:", "color: #3b82f6; font-weight: bold");
       console.log(curlCommand);
       console.log("%cRequest Details:", "color: #f59e0b; font-weight: bold");
@@ -250,27 +266,45 @@ class ApiClient {
     }
   }
 
-  async get<T>(url: string, config?: InternalAxiosRequestConfig): Promise<ApiResponse<T>> {
+  async get<T>(
+    url: string,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
     const response = await this.client.get<ApiResponse<T>>(url, config);
     return response.data;
   }
 
-  async post<T>(url: string, data?: unknown, config?: InternalAxiosRequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
     const response = await this.client.post<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
-  async put<T>(url: string, data?: unknown, config?: InternalAxiosRequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
     const response = await this.client.put<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
-  async delete<T>(url: string, config?: InternalAxiosRequestConfig): Promise<ApiResponse<T>> {
+  async delete<T>(
+    url: string,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
     const response = await this.client.delete<ApiResponse<T>>(url, config);
     return response.data;
   }
 
-  async postFormData<T>(url: string, formData: FormData, config?: InternalAxiosRequestConfig): Promise<ApiResponse<T>> {
+  async postFormData<T>(
+    url: string,
+    formData: FormData,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
     const response = await this.client.post<ApiResponse<T>>(url, formData, {
       ...config,
       headers: {
@@ -282,4 +316,3 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
-

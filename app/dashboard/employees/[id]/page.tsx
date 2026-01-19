@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Shield, UserCog } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCog, Send } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
 import { authApi } from "@/lib/api/auth";
 import { Employee, User } from "@/lib/types";
@@ -14,7 +14,9 @@ import { useToast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getErrorMessage, formatApiErrorMessage } from "@/lib/utils";
+import { Controller } from "react-hook-form";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { getErrorMessage, formatApiErrorMessage, formatRole } from "@/lib/utils";
 
 const employeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -37,12 +39,14 @@ export default function EmployeeDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    control,
   } = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
   });
@@ -121,6 +125,31 @@ export default function EmployeeDetailPage() {
     }
   };
 
+
+
+  const handleResendVerification = async () => {
+    if (!user?.email) return;
+    
+    setIsResending(true);
+    try {
+      await authApi.resendVerification(user.email);
+      addToast({
+        title: "Success",
+        description: "Verification link sent successfully",
+        variant: "success",
+      });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      addToast({
+        title: "Error",
+        description: errorMessage || "Failed to send verification link",
+        variant: "error",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const onSubmit = async (data: EmployeeFormData) => {
     if (!employee) return;
 
@@ -160,7 +189,7 @@ export default function EmployeeDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-600 dark:text-gray-400">Employee not found</p>
-        <Button onClick={() => router.push("/dashboard/employees")} className="mt-4">
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/employees")} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Employees
         </Button>
@@ -175,7 +204,7 @@ export default function EmployeeDetailPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-4"
       >
-        <Button variant="ghost" onClick={() => router.push("/dashboard/employees")}>
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/employees")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -230,25 +259,43 @@ export default function EmployeeDetailPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Role</p>
                     <div className="flex items-center gap-2">
                       <span className="px-3 py-1 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-sm font-semibold">
-                        {user.role}
+                        {formatRole(user.role)}
                       </span>
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email Verified</p>
-                    <div className="flex items-center gap-2">
-                      {user.isEmailVerified ? (
-                        <>
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span className="text-sm font-medium text-green-600 dark:text-green-400">Verified</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-2 h-2 bg-red-500 rounded-full" />
-                          <span className="text-sm font-medium text-red-600 dark:text-red-400">Not Verified</span>
-                        </>
-                      )}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email Verified</p>
+                      <div className="flex items-center gap-2">
+                        {user.isEmailVerified ? (
+                          <>
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                            <span className="text-sm font-medium text-green-600 dark:text-green-400">Verified</span>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full" />
+                            <span className="text-sm font-medium text-red-600 dark:text-red-400">Not Verified</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    {!user.isEmailVerified && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendVerification}
+                        disabled={isResending}
+                        className="text-xs h-7 ml-2"
+                      >
+                        {isResending ? (
+                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                        ) : (
+                          <Send className="h-3 w-3 mr-2" />
+                        )}
+                        {isResending ? "Sending..." : "Resend Link"}
+                      </Button>
+                    )}
                   </div>
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Account Created</p>
@@ -416,11 +463,16 @@ export default function EmployeeDetailPage() {
                   <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Salary
                   </label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    step="0.01"
-                    {...register("salary", { valueAsNumber: true })}
+                  <Controller
+                    name="salary"
+                    control={control}
+                    render={({ field }) => (
+                      <CurrencyInput
+                        id="salary"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      />
+                    )}
                   />
                 </div>
               </div>

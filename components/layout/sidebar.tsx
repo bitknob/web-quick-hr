@@ -20,7 +20,7 @@ import {
   ChevronRight,
   Grid3x3,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatRole } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { authApi } from "@/lib/api/auth";
 import { MenuItem } from "@/lib/types";
@@ -197,7 +197,7 @@ export function Sidebar() {
             </h1>
             {user?.role && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 capitalize">
-                {user.role.replace(/_/g, " ")}
+                {formatRole(user.role)}
               </p>
             )}
           </div>

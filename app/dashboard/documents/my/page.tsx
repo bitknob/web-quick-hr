@@ -29,6 +29,7 @@ import { SkeletonTable } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useTranslations } from "@/lib/hooks/use-translations";
 import { getErrorMessage } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/api-client";
 import Link from "next/link";
 
 const documentTypeLabels: Record<DocumentType, string> = {
@@ -180,7 +181,13 @@ export default function MyDocumentsPage() {
   };
 
   const handleDownload = (document: Document) => {
-    window.open(document.fileUrl, "_blank");
+    const link = window.document.createElement("a");
+    link.href = getFullFileUrl(document.fileUrl);
+    link.download = document.fileName;
+    link.target = "_blank";
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
   };
 
   const getStatusColor = (status: DocumentStatus) => {
@@ -212,6 +219,12 @@ export default function MyDocumentsPage() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const getFullFileUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   const hasActiveFilters = documentTypeFilter !== "all" || statusFilter !== "all" || searchTerm.trim() !== "";
@@ -363,7 +376,7 @@ export default function MyDocumentsPage() {
                             </DropdownItem>
                             <DropdownItem
                               onClick={() => {
-                                window.open(document.fileUrl, "_blank");
+                                window.open(getFullFileUrl(document.fileUrl), "_blank");
                               }}
                             >
                               <Eye className="h-4 w-4 mr-2" />

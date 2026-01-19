@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { ArrowLeft, Upload, FileText, X, Check } from "lucide-react";
+import { ArrowLeft, Upload, FileText, X, Check, RefreshCw } from "lucide-react";
 import { documentsApi } from "@/lib/api/documents";
 import { employeesApi } from "@/lib/api/employees";
-import { DocumentType } from "@/lib/types";
+import { searchApi } from "@/lib/api/search";
+import { DocumentType, Employee } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { useTranslations } from "@/lib/hooks/use-translations";
 import { useForm } from "react-hook-form";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 const documentUploadSchema = z.object({
+  employeeId: z.string().min(1, "Please select an employee"),
   documentType: z.enum([
     "id_proof",
     "address_proof",
@@ -82,6 +84,9 @@ export default function UploadDocumentPage() {
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string>("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -90,32 +95,150 @@ export default function UploadDocumentPage() {
     formState: { errors },
     setValue,
     resetField,
+    watch,
   } = useForm<DocumentUploadFormData>({
     resolver: zodResolver(documentUploadSchema),
     defaultValues: {
+      employeeId: "",
       documentType: "id_proof",
       expiryDate: "",
       notes: "",
     },
   });
 
+  const selectedEmployeeId = watch("employeeId");
+
 
   useEffect(() => {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        setCurrentEmployeeId(response.response.id);
-        setCurrentCompanyId(response.response.companyId);
-      } catch {
+        const currentEmp = response.response;
+        setCurrentEmployeeId(currentEmp.id);
+        setCurrentCompanyId(currentEmp.companyId);
+        // Set current employee as default selection
+        setValue("employeeId", currentEmp.id);
+        // Add current employee to the list
+        setEmployees([currentEmp]);
+        setIsLoadingEmployees(false);
+      } catch (error) {
+        console.error("Failed to fetch current employee:", error);
         addToast({
           title: "Error",
           description: "Failed to fetch employee information",
           variant: "error",
         });
+        setIsLoadingEmployees(false);
       }
     };
     fetchCurrentEmployee();
-  }, [addToast]);
+  }, [addToast, setValue]);
+
+  // Debounced search for employees
+  useEffect(() => {
+    if (!currentCompanyId || !currentEmployeeId) return;
+    
+    // If search term is empty, reset to show current employee and any selected employee
+    if (!employeeSearchTerm.trim()) {
+      setEmployees((prevEmployees) => {
+        // Build list of employees to show
+        const employeesToShow: Employee[] = [];
+        
+        // Always include current employee
+        const currentEmp = prevEmployees.find(e => e.id === currentEmployeeId);
+        if (currentEmp) {
+          employeesToShow.push(currentEmp);
+        }
+        
+        // Also include the selected employee if different from current
+        if (selectedEmployeeId && selectedEmployeeId !== currentEmployeeId) {
+          const selectedEmp = prevEmployees.find(e => e.id === selectedEmployeeId);
+          if (selectedEmp) {
+            employeesToShow.push(selectedEmp);
+          }
+        }
+        
+        // Only update if the list has changed
+        if (prevEmployees.length === employeesToShow.length) {
+          return prevEmployees;
+        }
+        return employeesToShow;
+      });
+      return;
+    }
+
+    const searchEmployees = async () => {
+      setIsLoadingEmployees(true);
+      try {
+        // Use global search API instead of employee-specific search
+        const response = await searchApi.globalSearch({ 
+          searchTerm: employeeSearchTerm,
+          limit: 50 // Limit results for performance
+        });
+        
+        // Filter only employee results and map to Employee type
+        const employeeResults = response.response.results
+          .filter(result => result.type === "employee")
+          .map(result => ({
+            id: result.id,
+            employeeId: result.metadata?.employeeId as string || "",
+            firstName: result.title.split(" ")[0] || "",
+            lastName: result.title.split(" ").slice(1).join(" ") || "",
+            userCompEmail: result.metadata?.userCompEmail as string || "",
+            department: result.subtitle.split(" • ")[1] || "",
+            // Required fields from Employee type
+            userEmail: result.metadata?.userCompEmail as string || "",
+            companyId: result.metadata?.companyId as string || currentCompanyId || "",
+            jobTitle: result.subtitle.split(" • ")[0] || "",
+            hireDate: "",
+            status: "active" as const,
+            createdAt: "",
+            updatedAt: "",
+          })) as Employee[];
+        
+        setEmployees((prevEmployees) => {
+          // Always include current employee if not in results
+          const currentEmp = prevEmployees.find(e => e.id === currentEmployeeId);
+          const hasCurrentEmp = employeeResults.some(e => e.id === currentEmployeeId);
+          
+          if (currentEmp && !hasCurrentEmp) {
+            return [currentEmp, ...employeeResults];
+          }
+          return employeeResults;
+        });
+      } catch (error: any) {
+        console.error("Failed to search employees:", error);
+        
+        // Don't show error toast for every failed search - just keep current state
+        // Only show error if it's not a 500 (which might be expected if endpoint doesn't exist yet)
+        if (error?.response?.status !== 500) {
+          addToast({
+            title: "Search Failed",
+            description: "Unable to search employees. Please try again.",
+            variant: "error",
+          });
+        }
+        
+        // Keep the current employee in the list on error
+        setEmployees((prevEmployees) => {
+          const currentEmp = prevEmployees.find(e => e.id === currentEmployeeId);
+          if (currentEmp) {
+            return [currentEmp];
+          }
+          return prevEmployees;
+        });
+      } finally {
+        setIsLoadingEmployees(false);
+      }
+    };
+
+    // Debounce the search - wait 300ms after user stops typing
+    const timeoutId = setTimeout(() => {
+      searchEmployees();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [employeeSearchTerm, currentCompanyId, currentEmployeeId, selectedEmployeeId, addToast]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,10 +294,16 @@ export default function UploadDocumentPage() {
   };
 
   const onSubmit = async (data: DocumentUploadFormData) => {
-    if (!currentEmployeeId || !currentCompanyId) {
+    // Find the selected employee object to get their specific companyId
+    const selectedEmployee = employees.find(e => e.id === data.employeeId);
+    
+    // Use the employee's company ID if available, otherwise fall back to current context
+    const targetCompanyId = selectedEmployee?.companyId || currentCompanyId;
+
+    if (!targetCompanyId) {
       addToast({
         title: "Error",
-        description: "Unable to determine employee or company information",
+        description: "Unable to determine company information",
         variant: "error",
       });
       return;
@@ -189,8 +318,8 @@ export default function UploadDocumentPage() {
     try {
       await documentsApi.uploadDocument({
         document: selectedFile,
-        employeeId: currentEmployeeId,
-        companyId: currentCompanyId,
+        employeeId: data.employeeId,
+        companyId: targetCompanyId,
         documentType: data.documentType,
         documentName: data.documentName,
         expiryDate: data.expiryDate || undefined,
@@ -248,6 +377,86 @@ export default function UploadDocumentPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4">
+              {/* Employee Selection */}
+              <div>
+                <label
+                  htmlFor="employeeSearch"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Employee <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      id="employeeSearch"
+                      type="text"
+                      placeholder="Type to search employees by name, ID, email, or department..."
+                      value={employeeSearchTerm}
+                      onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                    {employeeSearchTerm && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {isLoadingEmployees ? (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Searching...
+                          </div>
+                        ) : employees.length > 0 ? (
+                          employees.map((employee) => (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              onClick={() => {
+                                setValue("employeeId", employee.id, { shouldValidate: true });
+                                setEmployeeSearchTerm("");
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                            >
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
+                                {employee.firstName} {employee.lastName}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                ID: {employee.employeeId}
+                                {employee.department && ` • ${employee.department}`}
+                                {employee.userCompEmail && ` • ${employee.userCompEmail}`}
+                              </p>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                            No employees found. Try a different search term.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Hidden select for form validation */}
+                  <select
+                    {...register("employeeId")}
+                    className="hidden"
+                  >
+                    <option value="">Select an employee</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.firstName} {employee.lastName}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {errors.employeeId && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.employeeId.message}</p>
+                  )}
+                  {selectedEmployeeId && (
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-300">
+                        <strong>Selected:</strong> {employees.find(e => e.id === selectedEmployeeId)?.firstName} {employees.find(e => e.id === selectedEmployeeId)?.lastName}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="document" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Document File <span className="text-red-500">*</span>

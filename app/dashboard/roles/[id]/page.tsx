@@ -86,7 +86,7 @@ export default function RoleDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-600 dark:text-gray-400">Role not found</p>
-        <Button onClick={() => router.push("/dashboard/roles")} className="mt-4">
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/roles")} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Roles
         </Button>
@@ -101,7 +101,7 @@ export default function RoleDetailPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-4"
       >
-        <Button variant="ghost" onClick={() => router.push("/dashboard/roles")}>
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/roles")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>

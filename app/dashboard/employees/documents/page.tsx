@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,15 @@ import {
   X,
   Eye,
   Download,
+  Upload,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 import { documentsApi } from "@/lib/api/documents";
 import { employeesApi } from "@/lib/api/employees";
-import { companiesApi } from "@/lib/api/companies";
-import { authApi } from "@/lib/api/auth";
-import { Document, DocumentType, DocumentStatus, Employee, Company, UserRole } from "@/lib/types";
-import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
+import { Document, DocumentType, DocumentStatus } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
@@ -56,8 +58,9 @@ const getDocumentStatusLabels = (t: ReturnType<typeof useTranslations>): Record<
   expired: t.documentStatus.expired,
 });
 
-export default function DocumentsPage() {
+export default function EmployeeDocumentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
   const t = useTranslations();
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -67,74 +70,28 @@ export default function DocumentsPage() {
   const [documentTypeFilter, setDocumentTypeFilter] = useState<DocumentType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | "all">("all");
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<AutocompleteOption | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<AutocompleteOption | null>(null);
-  const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
-  const [isSearchingEmployees, setIsSearchingEmployees] = useState(false);
-  const [companyOptions, setCompanyOptions] = useState<AutocompleteOption[]>([]);
-  const [employeeOptions, setEmployeeOptions] = useState<AutocompleteOption[]>([]);
   const hasFetchedRef = useRef(false);
 
   const documentTypeLabels = getDocumentTypeLabels(t);
   const documentStatusLabels = getDocumentStatusLabels(t);
 
-  const searchCompanies = useCallback(async (searchTerm: string) => {
-    setIsSearchingCompanies(true);
-    try {
-      const response = await companiesApi.getCompanies({
-        searchTerm,
-        limit: 20,
-        status: "active",
-      });
-      const options: AutocompleteOption[] = response.response.map((company: Company) => ({
-        id: company.id,
-        label: company.name,
-        subtitle: company.code,
-      }));
-      setCompanyOptions(options);
-    } catch {
-      setCompanyOptions([]);
-    } finally {
-      setIsSearchingCompanies(false);
-    }
-  }, []);
-
-  const searchEmployees = useCallback(async (searchTerm: string) => {
-    setIsSearchingEmployees(true);
-    try {
-      const response = await employeesApi.searchEmployees({
-        searchTerm,
-        limit: 20,
-        companyId: selectedCompany?.id || currentCompanyId || undefined,
-      });
-      const options: AutocompleteOption[] = response.response.map((employee: Employee) => ({
-        id: employee.id,
-        label: `${employee.firstName} ${employee.lastName}`,
-        subtitle: `${employee.userEmail} - ${employee.jobTitle}`,
-      }));
-      setEmployeeOptions(options);
-    } catch {
-      setEmployeeOptions([]);
-    } finally {
-      setIsSearchingEmployees(false);
-    }
-  }, [selectedCompany?.id, currentCompanyId]);
+  // Get employee ID from URL if present
+  const employeeIdFromUrl = searchParams.get("employeeId");
 
   const fetchDocuments = useCallback(async () => {
+    if (!currentCompanyId) {
+      setIsLoading(false);
+      setDocuments([]);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const params: {
         documentType?: DocumentType;
         status?: DocumentStatus;
-        companyId?: string;
         employeeId?: string;
-        page: number;
-        limit: number;
-      } = {
-        page: 1,
-        limit: 100,
-      };
+      } = {};
 
       if (documentTypeFilter !== "all") {
         params.documentType = documentTypeFilter;
@@ -142,14 +99,11 @@ export default function DocumentsPage() {
       if (statusFilter !== "all") {
         params.status = statusFilter;
       }
-      if (selectedCompany) {
-        params.companyId = selectedCompany.id;
-      }
-      if (selectedEmployee) {
-        params.employeeId = selectedEmployee.id;
+      if (employeeIdFromUrl) {
+        params.employeeId = employeeIdFromUrl;
       }
 
-      const response = await documentsApi.getAllDocuments(params);
+      const response = await documentsApi.getDocumentsByCompany(currentCompanyId, params);
       setDocuments(response.response || []);
     } catch (error: unknown) {
       console.error("Failed to fetch documents:", error);
@@ -162,40 +116,45 @@ export default function DocumentsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [documentTypeFilter, statusFilter, selectedCompany, selectedEmployee, addToast, t.toast.error, t.documents.failedToFetchDocuments]);
+  }, [currentCompanyId, documentTypeFilter, statusFilter, employeeIdFromUrl, addToast, t.toast.error, t.documents.failedToFetchDocuments]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
     
-    const fetchCurrentUserInfo = async () => {
+    const fetchCurrentEmployee = async () => {
       hasFetchedRef.current = true;
       setIsLoading(true);
       try {
-        const [employeeRes, userRes] = await Promise.all([
-          employeesApi.getCurrentEmployee(),
-          authApi.getCurrentUser(),
-        ]);
-        
-        const companyId = employeeRes.response.companyId;
+        const response = await employeesApi.getCurrentEmployee();
+        const companyId = response.response.companyId;
         if (companyId) {
           setCurrentCompanyId(companyId);
+        } else {
+          setIsLoading(false);
+          addToast({
+            title: t.toast.error,
+            description: t.errors.failedToFetchCompanyInfo,
+            variant: "error",
+          });
         }
-        
-        const role = userRes.response.role;
-        setUserRole(role);
-      } catch (error) {
-        console.error("Failed to fetch user info:", error);
-      } finally {
+      } catch {
         setIsLoading(false);
+        addToast({
+          title: t.toast.error,
+          description: t.errors.failedToFetchCompanyInfo,
+          variant: "error",
+        });
       }
     };
-    fetchCurrentUserInfo();
+    fetchCurrentEmployee();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]);
+    if (currentCompanyId) {
+      fetchDocuments();
+    }
+  }, [fetchDocuments, currentCompanyId]);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -205,9 +164,7 @@ export default function DocumentsPage() {
         (doc) =>
           doc.documentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           documentTypeLabels[doc.documentType].toLowerCase().includes(searchTerm.toLowerCase()) ||
-          doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (doc.employee &&
-            `${doc.employee.firstName} ${doc.employee.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()))
+          doc.fileName.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredDocuments(filtered);
     }
@@ -225,6 +182,21 @@ export default function DocumentsPage() {
         return "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300";
+    }
+  };
+
+  const getStatusIcon = (status: DocumentStatus) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4" />;
+      case "verified":
+        return <CheckCircle className="h-4 w-4" />;
+      case "rejected":
+        return <XCircle className="h-4 w-4" />;
+      case "expired":
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
     }
   };
 
@@ -250,21 +222,21 @@ export default function DocumentsPage() {
     return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
-  const isPrivileged = userRole === "super_admin" || userRole === "provider_admin" || userRole === "hrbp";
-
-  const hasActiveFilters = 
-    documentTypeFilter !== "all" || 
-    statusFilter !== "all" || 
-    searchTerm.trim() !== "" ||
-    selectedCompany !== null ||
-    selectedEmployee !== null;
+  const hasActiveFilters = documentTypeFilter !== "all" || statusFilter !== "all" || searchTerm.trim() !== "";
 
   const clearFilters = () => {
     setSearchTerm("");
     setDocumentTypeFilter("all");
     setStatusFilter("all");
-    setSelectedCompany(null);
-    setSelectedEmployee(null);
+  };
+
+  // Calculate document statistics
+  const stats = {
+    total: documents.length,
+    pending: documents.filter(d => d.status === "pending").length,
+    verified: documents.filter(d => d.status === "verified").length,
+    rejected: documents.filter(d => d.status === "rejected").length,
+    expired: documents.filter(d => d.status === "expired").length,
   };
 
   return (
@@ -275,30 +247,108 @@ export default function DocumentsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t.documents.title}</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">{t.documents.description}</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Document Management
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            View, manage, and track all employee documents
+          </p>
         </div>
         <div className="flex gap-3">
           <Link href="/dashboard/documents/upload">
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              {t.documents.uploadDocument}
+              Upload Document
             </Button>
           </Link>
         </div>
       </motion.div>
 
+      {/* Document Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Documents</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+              </div>
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.pending}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Verified</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.verified}</p>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Rejected</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</p>
+              </div>
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Expired</p>
+                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.expired}</p>
+              </div>
+              <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Link href="/dashboard/documents/my">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Link href="/dashboard/documents/upload">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-500">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  <Upload className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{t.documents.myDocuments}</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t.documents.viewYourFiles}</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload New</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Add a new document</p>
                 </div>
               </div>
             </CardContent>
@@ -306,31 +356,31 @@ export default function DocumentsPage() {
         </Link>
 
         <Link href="/dashboard/documents/pending">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-yellow-500">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
                   <Filter className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{t.documents.pendingVerification}</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t.documents.reviewDocuments}</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Review Pending</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Documents awaiting verification</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Link href="/dashboard/documents/upload">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Link href="/dashboard/documents/my">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-green-500">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                  <Plus className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{t.documents.uploadNew}</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t.documents.addDocument}</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">My Documents</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">View your uploaded files</p>
                 </div>
               </div>
             </CardContent>
@@ -338,52 +388,27 @@ export default function DocumentsPage() {
         </Link>
       </div>
 
+      {/* Documents Table */}
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <CardTitle>{t.documents.allDocuments}</CardTitle>
-            <div className="flex flex-col md:flex-row gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+            <CardTitle>All Documents</CardTitle>
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder={t.documents.searchDocuments}
+                  placeholder="Search documents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-
-              {isPrivileged && (
-                <>
-                  <div className="min-w-[200px]">
-                    <Autocomplete
-                      placeholder="Filter by Company"
-                      options={companyOptions}
-                      value={selectedCompany}
-                      onChange={setSelectedCompany}
-                      onSearch={searchCompanies}
-                      isLoading={isSearchingCompanies}
-                    />
-                  </div>
-                  <div className="min-w-[200px]">
-                    <Autocomplete
-                      placeholder="Filter by Employee"
-                      options={employeeOptions}
-                      value={selectedEmployee}
-                      onChange={setSelectedEmployee}
-                      onSearch={searchEmployees}
-                      isLoading={isSearchingEmployees}
-                    />
-                  </div>
-                </>
-              )}
-
               <Select
                 value={documentTypeFilter}
                 onChange={(e) => setDocumentTypeFilter(e.target.value as DocumentType | "all")}
                 className="w-full md:w-48"
               >
-                <option value="all">{t.documents.allTypes}</option>
+                <option value="all">All Types</option>
                 {(Object.keys(documentTypeLabels) as DocumentType[]).map((value) => (
                   <option key={value} value={value}>
                     {documentTypeLabels[value]}
@@ -395,7 +420,7 @@ export default function DocumentsPage() {
                 onChange={(e) => setStatusFilter(e.target.value as DocumentStatus | "all")}
                 className="w-full md:w-40"
               >
-                <option value="all">{t.documents.allStatus}</option>
+                <option value="all">All Status</option>
                 {(Object.keys(documentStatusLabels) as DocumentStatus[]).map((value) => (
                   <option key={value} value={value}>
                     {documentStatusLabels[value]}
@@ -405,12 +430,12 @@ export default function DocumentsPage() {
               {hasActiveFilters && (
                 <Button onClick={clearFilters} variant="outline" className="whitespace-nowrap">
                   <X className="h-4 w-4 mr-2" />
-                  {t.documents.clearFilters}
+                  Clear
                 </Button>
               )}
               <Button onClick={fetchDocuments} variant="outline" isLoading={isLoading}>
                 <RefreshCw className="h-4 w-4 mr-2" />
-                {t.common.refresh}
+                Refresh
               </Button>
             </div>
           </div>
@@ -423,14 +448,13 @@ export default function DocumentsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.employee}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.documentName}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.type}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.status}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.fileSize}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.expiryDate}</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.documents.uploaded}</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">{t.common.actions}</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Document</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">File Size</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Expiry Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Uploaded</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -443,33 +467,26 @@ export default function DocumentsPage() {
                       className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
                       <td className="py-4 px-4">
-                        <div>
-                          <p className="text-gray-900 dark:text-gray-100 font-medium">
-                            {document.employee
-                              ? `${document.employee.firstName} ${document.employee.lastName}`
-                              : document.employeeId}
-                          </p>
-                          {document.employee?.employeeId && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{document.employee.employeeId}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                          </div>
                           <div>
                             <p className="text-gray-900 dark:text-gray-100 font-medium">{document.documentName}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{document.fileName}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                        {documentTypeLabels[document.documentType]}
+                      <td className="py-4 px-4">
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {documentTypeLabels[document.documentType]}
+                        </span>
                       </td>
                       <td className="py-4 px-4">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(document.status)}`}>
+                        <div className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full ${getStatusColor(document.status)}`}>
+                          {getStatusIcon(document.status)}
                           {documentStatusLabels[document.status]}
-                        </span>
+                        </div>
                       </td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">{formatFileSize(document.fileSize)}</td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
@@ -482,7 +499,7 @@ export default function DocumentsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => window.open(getFullFileUrl(document.fileUrl), "_blank")}
-                            title={t.documents.viewDocument}
+                            title="View Document"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -492,7 +509,7 @@ export default function DocumentsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 disabled:pointer-events-none disabled:opacity-50 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8"
-                            title={t.documents.downloadDocument}
+                            title="Download Document"
                           >
                             <Download className="h-4 w-4" />
                           </a>
@@ -506,16 +523,16 @@ export default function DocumentsPage() {
           ) : (
             <EmptyState
               icon={FileText}
-              title={hasActiveFilters ? t.documents.noDocumentsFound : t.documents.noDocumentsUploaded}
+              title={hasActiveFilters ? "No documents found" : "No documents uploaded"}
               description={
                 hasActiveFilters
-                  ? t.documents.tryAdjustingFilters
-                  : t.documents.getStartedByUploading
+                  ? "Try adjusting your filters to see more results"
+                  : "Get started by uploading your first document"
               }
               action={
                 !hasActiveFilters
                   ? {
-                      label: t.documents.uploadDocument,
+                      label: "Upload Document",
                       onClick: () => router.push("/dashboard/documents/upload"),
                     }
                   : undefined
@@ -527,4 +544,3 @@ export default function DocumentsPage() {
     </div>
   );
 }
-

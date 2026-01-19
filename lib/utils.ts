@@ -69,10 +69,30 @@ export function getErrorMessage(error: unknown): string {
  */
 export function formatApiErrorMessage(
   responseMessage: string,
-  responseDetail?: string
+  responseDetail?: string,
 ): string {
   if (responseDetail) {
     return `${responseMessage}: ${responseDetail}`;
   }
   return responseMessage;
+}
+
+export function formatRole(role: string): string {
+  if (!role) return "";
+  return role
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function formatCurrency(amount: number | string): string {
+  if (amount === null || amount === undefined || amount === "") return "";
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(num)) return "";
+
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(num);
 }

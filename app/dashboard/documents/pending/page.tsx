@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { useTranslations } from "@/lib/hooks/use-translations";
 import { getErrorMessage } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/api-client";
 
 const documentTypeLabels: Record<DocumentType, string> = {
   id_proof: "ID Proof",
@@ -176,6 +177,12 @@ export default function PendingDocumentsPage() {
     });
   };
 
+  const getFullFileUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -259,19 +266,21 @@ export default function PendingDocumentsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(document.fileUrl, "_blank")}
+                            onClick={() => window.open(getFullFileUrl(document.fileUrl), "_blank")}
                             title={t.documents.viewDocument}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(document.fileUrl, "_blank")}
+                          <a
+                            href={getFullFileUrl(document.fileUrl)}
+                            download={document.fileName}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 disabled:pointer-events-none disabled:opacity-50 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8"
                             title={t.documents.downloadDocument}
                           >
                             <Download className="h-4 w-4" />
-                          </Button>
+                          </a>
                           <Button
                             variant="outline"
                             size="sm"

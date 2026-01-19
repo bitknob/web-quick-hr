@@ -14,7 +14,8 @@ import { companiesApi } from "@/lib/api/companies";
 import { employeesApi } from "@/lib/api/employees";
 import { Company, Employee } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -82,6 +83,7 @@ export default function NewReimbursementPage() {
     formState: { errors },
     setValue,
     watch,
+    control,
   } = useForm<ReimbursementFormData>({
     resolver: zodResolver(reimbursementSchema),
     defaultValues: {
@@ -139,7 +141,7 @@ export default function NewReimbursementPage() {
       const options: AutocompleteOption[] = response.response.map((employee: Employee) => ({
         id: employee.id,
         label: `${employee.firstName} ${employee.lastName}`,
-        subtitle: `${employee.email} - ${employee.jobTitle}`,
+        subtitle: `${employee.userEmail} - ${employee.jobTitle}`,
       }));
       setEmployeeOptions(options);
     } catch {
@@ -338,13 +340,17 @@ export default function NewReimbursementPage() {
                   <label htmlFor="claimAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Claim Amount <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    id="claimAmount"
-                    type="number"
-                    step="0.01"
-                    placeholder="15000"
-                    {...register("claimAmount", { valueAsNumber: true })}
-                    className={errors.claimAmount ? "border-red-500" : ""}
+                  <Controller
+                    name="claimAmount"
+                    control={control}
+                    render={({ field }) => (
+                      <CurrencyInput
+                         id="claimAmount"
+                         placeholder="15000"
+                         value={field.value}
+                         onValueChange={field.onChange}
+                       />
+                    )}
                   />
                   {errors.claimAmount && (
                     <p className="text-sm text-red-500 mt-1">{errors.claimAmount.message}</p>
@@ -423,12 +429,17 @@ export default function NewReimbursementPage() {
                     <label htmlFor="taxExemptionLimit" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Tax Exemption Limit
                     </label>
-                    <Input
-                      id="taxExemptionLimit"
-                      type="number"
-                      step="0.01"
-                      placeholder="15000"
-                      {...register("taxExemptionLimit", { valueAsNumber: true })}
+                    <Controller
+                      name="taxExemptionLimit"
+                      control={control}
+                      render={({ field }) => (
+                        <CurrencyInput
+                          id="taxExemptionLimit"
+                          placeholder="15000"
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        />
+                      )}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Maximum amount exempt from tax

@@ -14,7 +14,8 @@ import { companiesApi } from "@/lib/api/companies";
 import { employeesApi } from "@/lib/api/employees";
 import { Company, Employee } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -82,6 +83,7 @@ export default function NewVariablePayPage() {
     formState: { errors },
     setValue,
     watch,
+    control,
   } = useForm<VariablePayFormData>({
     resolver: zodResolver(variablePaySchema),
     defaultValues: {
@@ -366,13 +368,17 @@ export default function NewVariablePayPage() {
                   <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Amount <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="50000"
-                    {...register("amount", { valueAsNumber: true })}
-                    className={errors.amount ? "border-red-500" : ""}
+                  <Controller
+                    name="amount"
+                    control={control}
+                    render={({ field }) => (
+                      <CurrencyInput
+                         id="amount"
+                         placeholder="50000"
+                         value={field.value}
+                         onValueChange={field.onChange}
+                       />
+                    )}
                   />
                   {errors.amount && (
                     <p className="text-sm text-red-500 mt-1">{errors.amount.message}</p>

@@ -10,6 +10,7 @@ import { Notification } from "@/lib/types";
 import { GlobalSearch } from "./global-search";
 import { useTranslations, useLanguage } from "@/lib/hooks/use-translations";
 import { Language } from "@/lib/i18n";
+import { formatRole } from "@/lib/utils";
 
 const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
@@ -140,7 +141,7 @@ export function Header() {
                 {user?.email || "User"}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">
-                {user?.role?.replace(/_/g, " ") || "Employee"}
+                {formatRole(user?.role) || "Employee"}
               </p>
             </div>
             <DropdownItem onClick={() => router.push("/dashboard/profile")}>
