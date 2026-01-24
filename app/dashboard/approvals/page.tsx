@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { motion } from "framer-motion";
 import { approvalsApi, GetApprovalsParams } from "@/lib/api/approvals";
 import { ApprovalRequest, ApprovalRequestType, ApprovalStatus } from "@/lib/types";
 import ApprovalRequestCard from "@/components/approvals/ApprovalRequestCard";
 import ApprovalFilters from "@/components/approvals/ApprovalFilters";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Filter } from "lucide-react";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function ApprovalsPage({
   params: paramsPromise,
@@ -60,44 +67,118 @@ export default function ApprovalsPage({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Approvals</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage approval requests</p>
+          </div>
+        </motion.div>
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonTable />
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[400px] text-red-500">
-        Error: {error}
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Approvals</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage approval requests</p>
+          </div>
+        </motion.div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <div className="text-red-500 text-lg font-medium">{error}</div>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline" 
+                className="mt-4"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Approvals</h1>
-        <div className="text-sm text-gray-500">
-          Showing {approvals.length} requests
+    <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Approvals</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage approval requests</p>
         </div>
-      </div>
-      
-      <ApprovalFilters onFilterChange={handleFilterChange} />
-      
-      <div className="mt-8">
-        {approvals.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-            <p className="text-gray-500">No approval requests found for the selected filters.</p>
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {approvals.map((approval) => (
-              <ApprovalRequestCard key={approval.id} approval={approval} />
-            ))}
-          </div>
-        )}
-      </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="default" className="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+            {approvals.length} requests
+          </Badge>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filters
+              </CardTitle>
+            </div>
+            <ApprovalFilters onFilterChange={handleFilterChange} />
+          </CardHeader>
+          <CardContent>
+            {approvals.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No approval requests found"
+                description="No approval requests found for the selected filters."
+                action={{
+                  label: "Clear Filters",
+                  onClick: () => setFilters({ status: "pending", requestType: "all" })
+                }}
+              />
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {approvals.map((approval, index) => (
+                  <motion.div
+                    key={approval.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <ApprovalRequestCard approval={approval} />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

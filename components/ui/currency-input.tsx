@@ -14,33 +14,23 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ className, value, onValueChange, ...props }, ref) => {
     const [displayValue, setDisplayValue] = React.useState("");
 
-    React.useEffect(() => {
+    const formatNumber = (num: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: num % 1 !== 0 ? 2 : 0,
+    }).format(num);
+  };
+
+  React.useEffect(() => {
       if (value !== undefined && value !== null && value !== "") {
         const num = typeof value === "string" ? parseFloat(value) : value;
         if (!isNaN(num)) {
-          // Check if we need to update based on creating a temporary raw value from current display
-          // This avoids overwriting user input while they type if the parent re-renders
-          const currentRaw = displayValue.replace(/,/g, "");
-          const currentNum = parseFloat(currentRaw);
-          
-          if (currentNum !== num) {
-             setDisplayValue(new Intl.NumberFormat("en-IN", {
-                maximumFractionDigits: 2,
-             }).format(num));
-          }
+          // Always format the value when it changes from external source
+          setDisplayValue(formatNumber(num));
         }
       } else if (value === undefined || value === "") {
-        // If external value is cleared, clear display, but be careful not to clear while typing 0 or "."
-        // Ideally we only clear if it really changed to undefined
-        if (displayValue !== "") { 
-            const currentRaw = displayValue.replace(/,/g, "");
-            if (currentRaw !== "") {
-                 setDisplayValue("");
-            }
-        }
+        setDisplayValue("");
       }
-      // We explicitly don't depend on displayValue to avoid cycles
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,10 +59,8 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       const rawValue = displayValue.replace(/,/g, "");
       const numberValue = parseFloat(rawValue);
-      if (!isNaN(numberValue)) {
-        setDisplayValue(new Intl.NumberFormat("en-IN", {
-            maximumFractionDigits: 2,
-        }).format(numberValue));
+      if (!isNaN(numberValue) && numberValue !== 0) {
+        setDisplayValue(formatNumber(numberValue));
       }
       if (props.onBlur) {
         props.onBlur(e);

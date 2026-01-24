@@ -28,13 +28,13 @@ export default function ApprovalRequestCard({ approval }: ApprovalRequestCardPro
   };
 
   return (
-    <Card>
+    <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="space-y-1">
-          <CardTitle className="text-xl font-bold">
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {approval.requestType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600 dark:text-gray-400">
             Requested by {approval.requestedBy}
           </CardDescription>
         </div>
@@ -45,19 +45,19 @@ export default function ApprovalRequestCard({ approval }: ApprovalRequestCardPro
       <CardContent>
         <div className="grid gap-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Date:</span>
-            <span>{format(new Date(approval.createdAt), "PPP")}</span>
+            <span className="text-gray-500 dark:text-gray-400">Date:</span>
+            <span className="text-gray-900 dark:text-gray-100">{format(new Date(approval.createdAt), "PPP")}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Priority:</span>
-            <span className="capitalize">{approval.priority}</span>
+            <span className="text-gray-500 dark:text-gray-400">Priority:</span>
+            <span className="capitalize text-gray-900 dark:text-gray-100">{approval.priority}</span>
           </div>
           <div className="mt-4 flex gap-2">
-            <Button variant="outline" size="sm" className="w-full">View Details</Button>
+            <Button variant="outline" size="sm" className="w-full hover:bg-gray-50 dark:hover:bg-gray-800">View Details</Button>
             {approval.status === 'pending' && (
               <>
                 <Button variant="default" size="sm" className="w-full bg-green-600 hover:bg-green-700">Approve</Button>
-                <Button variant="destructive" size="sm" className="w-full">Reject</Button>
+                <Button variant="destructive" size="sm" className="w-full hover:bg-red-600">Reject</Button>
               </>
             )}
           </div>

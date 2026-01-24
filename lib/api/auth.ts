@@ -50,7 +50,7 @@ export interface ChangePasswordRequest {
 
 export const authApi = {
   signup: async (
-    data: SignupRequest
+    data: SignupRequest,
   ): Promise<
     ApiResponse<{ user: User; accessToken: string; refreshToken: string }>
   > => {
@@ -69,7 +69,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
     const response = await apiClient.post<LoginResponse>(
       "/api/auth/login",
-      data
+      data,
     );
     if (response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
@@ -92,17 +92,17 @@ export const authApi = {
 
   resetPassword: async (
     token: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<ApiResponse<User>> => {
     return apiClient.post("/api/auth/reset-password", { token, newPassword });
   },
 
   refreshToken: async (
-    refreshToken: string
+    refreshToken: string,
   ): Promise<ApiResponse<RefreshTokenResponse>> => {
     const response = await apiClient.post<RefreshTokenResponse>(
       "/api/auth/refresh-token",
-      { refreshToken }
+      { refreshToken },
     );
     if (response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
@@ -122,7 +122,7 @@ export const authApi = {
   },
 
   changePassword: async (
-    data: ChangePasswordRequest
+    data: ChangePasswordRequest,
   ): Promise<ApiResponse<null>> => {
     return apiClient.post("/api/auth/change-password", data);
   },
@@ -142,7 +142,7 @@ export const authApi = {
   // Role Assignment APIs
   assignRole: async (
     userId: string,
-    role: string
+    role: string,
   ): Promise<ApiResponse<User>> => {
     return apiClient.post("/api/auth/assign-role", { userId, role });
   },
@@ -153,7 +153,19 @@ export const authApi = {
 
   getUserRoleByEmail: async (email: string): Promise<ApiResponse<User>> => {
     return apiClient.get(
-      `/api/auth/users/email/${encodeURIComponent(email)}/role`
+      `/api/auth/users/email/${encodeURIComponent(email)}/role`,
     );
+  },
+
+  resendCredentials: async (
+    email: string,
+    companyName?: string,
+  ): Promise<
+    ApiResponse<{ temporaryPassword: string; mustChangePassword: boolean }>
+  > => {
+    return apiClient.post("/api/auth/resend-credentials", {
+      email,
+      companyName,
+    });
   },
 };

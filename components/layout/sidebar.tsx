@@ -101,10 +101,18 @@ export function Sidebar() {
            error.message.includes("ERR_NETWORK") ||
            error.message.includes("Failed to fetch"));
         
-        if (isNetworkError) {
-          console.warn("Menu API unavailable - API server may not be running. Using empty menu.");
+        // Check for 503 Service Unavailable
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isServiceUnavailable = (error as any)?.response?.status === 503;
+        
+        if (isNetworkError || isServiceUnavailable) {
+          console.warn(
+            isServiceUnavailable 
+              ? "Menu API service unavailable (503). Using empty menu." 
+              : "Menu API unavailable - API server may not be running. Using empty menu."
+          );
         } else {
-        console.error("Failed to fetch menu:", error);
+          console.error("Failed to fetch menu:", error);
         }
         // Fallback to empty menu or default menu
         setMenuItems([]);

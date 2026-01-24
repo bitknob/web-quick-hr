@@ -176,9 +176,8 @@ export default function DocumentsPage() {
           authApi.getCurrentUser(),
         ]);
         
-        const companyId = employeeRes.response.companyId;
-        if (companyId) {
-          setCurrentCompanyId(companyId);
+        if ("companyId" in employeeRes.response) {
+          setCurrentCompanyId(employeeRes.response.companyId);
         }
         
         const role = userRes.response.role;
@@ -359,8 +358,8 @@ export default function DocumentsPage() {
                     <Autocomplete
                       placeholder="Filter by Company"
                       options={companyOptions}
-                      value={selectedCompany}
-                      onChange={setSelectedCompany}
+                      value={selectedCompany?.id}
+                      onSelect={setSelectedCompany}
                       onSearch={searchCompanies}
                       isLoading={isSearchingCompanies}
                     />
@@ -369,8 +368,8 @@ export default function DocumentsPage() {
                     <Autocomplete
                       placeholder="Filter by Employee"
                       options={employeeOptions}
-                      value={selectedEmployee}
-                      onChange={setSelectedEmployee}
+                      value={selectedEmployee?.id}
+                      onSelect={setSelectedEmployee}
                       onSearch={searchEmployees}
                       isLoading={isSearchingEmployees}
                     />

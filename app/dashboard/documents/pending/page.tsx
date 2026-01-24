@@ -69,6 +69,22 @@ export default function PendingDocumentsPage() {
       hasFetchedRef.current = true;
       try {
         const employeeResponse = await employeesApi.getCurrentEmployee();
+        
+        // Check if this is a super admin without employee record
+        if ('isSuperAdmin' in employeeResponse.response && employeeResponse.response.isSuperAdmin) {
+          // Super admin without employee record - show empty state
+          setIsLoading(false);
+          setDocuments([]);
+          return;
+        }
+        
+        // Regular employee response - type guard ensures we have Employee type
+        if (!('companyId' in employeeResponse.response)) {
+          setIsLoading(false);
+          setDocuments([]);
+          return;
+        }
+        
         const companyId = employeeResponse.response.companyId;
         if (companyId) {
           setCurrentCompanyId(companyId);
@@ -90,11 +106,15 @@ export default function PendingDocumentsPage() {
           setIsLoading(false);
         }
       } catch (error: unknown) {
-        addToast({
-          title: "Error",
-          description: getErrorMessage(error),
-          variant: "error",
-        });
+        // Only show error if it's not a 404 (no employee record)
+        const errorMessage = getErrorMessage(error);
+        if (!errorMessage.toLowerCase().includes('not found')) {
+          addToast({
+            title: "Error",
+            description: errorMessage,
+            variant: "error",
+          });
+        }
         setIsLoading(false);
       }
     };
@@ -274,8 +294,6 @@ export default function PendingDocumentsPage() {
                           <a
                             href={getFullFileUrl(document.fileUrl)}
                             download={document.fileName}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 disabled:pointer-events-none disabled:opacity-50 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8"
                             title={t.documents.downloadDocument}
                           >

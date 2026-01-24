@@ -38,13 +38,24 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
-      addToast({
-        title: "Success",
-        description: "Logged in successfully",
-        variant: "success",
-      });
-      router.push("/dashboard");
+      const result = await login(data.email, data.password);
+      
+      if (result.mustChangePassword) {
+        // Redirect to change password page
+        router.push('/change-password?forced=true');
+        addToast({
+          title: "Password Change Required",
+          description: "You must change your password to continue",
+          variant: "default",
+        });
+      } else {
+        addToast({
+          title: "Success",
+          description: "Logged in successfully",
+          variant: "success",
+        });
+        router.push("/dashboard");
+      }
     } catch (error: unknown) {
       addToast({
         title: "Error",
@@ -151,7 +162,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.6 }}
                 className="text-center text-sm text-gray-600 dark:text-gray-400"
               >
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link href="/signup" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 font-medium">
                   Sign up
                 </Link>

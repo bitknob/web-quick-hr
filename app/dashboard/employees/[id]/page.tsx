@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Shield, UserCog, Send } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCog, Send, Trash2, Users, UserPlus, FileText, KeyRound } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
+import { companiesApi } from "@/lib/api/companies";
 import { authApi } from "@/lib/api/auth";
-import { Employee, User } from "@/lib/types";
+import { Employee, User, Company } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Controller } from "react-hook-form";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { getErrorMessage, formatApiErrorMessage, formatRole } from "@/lib/utils";
+import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getErrorMessage, formatApiErrorMessage, formatRole, debounce } from "@/lib/utils";
+import Link from "next/link";
 
 const employeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -35,11 +39,22 @@ export default function EmployeeDetailPage() {
   const params = useParams();
   const { addToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [isResendingCredentials, setIsResendingCredentials] = useState(false);
+  const [showResendConfirmDialog, setShowResendConfirmDialog] = useState(false);
+  const [directReports, setDirectReports] = useState<Employee[]>([]);
+  const [isLoadingDirectReports, setIsLoadingDirectReports] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<AutocompleteOption[]>([]);
+  const [isSearchingManagers, setIsSearchingManagers] = useState(false);
+  const [selectedNewManager, setSelectedNewManager] = useState<AutocompleteOption | null>(null);
+  const [showTransferUI, setShowTransferUI] = useState(false);
 
   const {
     register,
@@ -80,6 +95,16 @@ export default function EmployeeDetailPage() {
       }
       
       setEmployee(response.response);
+      
+      // Fetch company details
+      try {
+        const companyResponse = await companiesApi.getCompany(response.response.companyId);
+        setCompany(companyResponse.response);
+      } catch (error) {
+        console.error("Failed to fetch company details:", error);
+        // Continue without company details
+      }
+      
       reset({
         firstName: response.response.firstName,
         lastName: response.response.lastName,
@@ -93,6 +118,8 @@ export default function EmployeeDetailPage() {
       if (response.response.userCompEmail) {
         fetchUserRole(response.response.userCompEmail);
       }
+      // Fetch direct reports
+      fetchDirectReports(response.response.id);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       addToast({
@@ -125,7 +152,131 @@ export default function EmployeeDetailPage() {
     }
   };
 
+  const fetchDirectReports = async (managerId: string) => {
+    setIsLoadingDirectReports(true);
+    try {
+      const response = await employeesApi.getDirectReports(managerId);
+      setDirectReports(response.response || []);
+    } catch (error) {
+      console.error("Failed to fetch direct reports:", error);
+    } finally {
+      setIsLoadingDirectReports(false);
+    }
+  };
 
+  const searchManagersImpl = async (searchTerm: string) => {
+    setIsSearchingManagers(true);
+    try {
+      if (!employee) return;
+      
+      const response = await employeesApi.getPotentialManagers(employee.id, searchTerm);
+      
+      const options = response.response.map((emp) => ({
+        id: emp.id,
+        label: `${emp.firstName} ${emp.lastName}`,
+        subtitle: `${emp.jobTitle} - ${emp.employeeId}`,
+      }));
+      setManagerOptions(options);
+    } catch {
+      setManagerOptions([]);
+    } finally {
+      setIsSearchingManagers(false);
+    }
+  };
+
+  const searchManagers = useMemo(
+    () => debounce(searchManagersImpl, 300),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [employee]
+  );
+
+  const handleDelete = async () => {
+    if (!employee) return;
+    
+    if (!confirm("Are you sure you want to delete this employee? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await employeesApi.deleteEmployee(employee.id);
+      addToast({
+        title: "Success",
+        description: "Employee deleted successfully",
+        variant: "success",
+      });
+      router.push("/dashboard/employees");
+    } catch (error: unknown) {
+      addToast({
+        title: "Error",
+        description: getErrorMessage(error) || "Failed to delete employee",
+        variant: "error",
+      });
+      setIsDeleting(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!employee || !selectedNewManager) return;
+
+    setIsTransferring(true);
+    try {
+      await employeesApi.transferEmployee(employee.id, {
+        newManagerId: selectedNewManager.id,
+      });
+      addToast({
+        title: "Success",
+        description: "Employee transferred successfully",
+        variant: "success",
+      });
+      // Refresh employee data
+      fetchEmployee(employee.id);
+      setShowTransferUI(false);
+      setSelectedNewManager(null);
+    } catch (error: unknown) {
+      addToast({
+        title: "Error",
+        description: getErrorMessage(error) || "Failed to transfer employee",
+        variant: "error",
+      });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+
+
+  const handleResendCredentials = () => {
+    if (!user?.email || !employee) return;
+    setShowResendConfirmDialog(true);
+  };
+
+  const confirmResendCredentials = async () => {
+    if (!user?.email || !employee) return;
+    setShowResendConfirmDialog(false);
+
+    setIsResendingCredentials(true);
+    try {
+      const companyName = company?.name || "Unknown Company";
+      const response = await authApi.resendCredentials(user.email, companyName);
+      const { temporaryPassword } = response.response;
+      
+      addToast({
+        title: "Success",
+        description: `Credentials sent! Temp Password: ${temporaryPassword}`,
+        variant: "success",
+      });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      addToast({
+        title: "Error",
+        description: errorMessage || "Failed to resend credentials",
+        variant: "error",
+      });
+    } finally {
+      setIsResendingCredentials(false);
+    }
+  };
 
   const handleResendVerification = async () => {
     if (!user?.email) return;
@@ -135,7 +286,7 @@ export default function EmployeeDetailPage() {
       await authApi.resendVerification(user.email);
       addToast({
         title: "Success",
-        description: "Verification link sent successfully",
+        description: user.mustChangePassword ? "Authentication mail sent successfully" : "Verification link sent successfully",
         variant: "success",
       });
     } catch (error: unknown) {
@@ -230,15 +381,27 @@ export default function EmployeeDetailPage() {
                 User Role Information
               </CardTitle>
               {user && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/dashboard/user-roles?userId=${user.id}&employeeId=${employee.id}`)}
-                  className="gap-2"
-                >
-                  <UserCog className="h-4 w-4" />
-                  Manage User Role
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendCredentials}
+                    isLoading={isResendingCredentials}
+                    className="gap-2 text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-900/20"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    Resend Credentials
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/user-roles?userId=${user.id}&employeeId=${employee.id}`)}
+                    className="gap-2"
+                  >
+                    <UserCog className="h-4 w-4" />
+                    Manage User Role
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
@@ -293,7 +456,11 @@ export default function EmployeeDetailPage() {
                         ) : (
                           <Send className="h-3 w-3 mr-2" />
                         )}
-                        {isResending ? "Sending..." : "Resend Link"}
+                        {isResending ? (
+                          user.mustChangePassword ? "Sending Authentication Mail..." : "Sending..."
+                        ) : (
+                          user.mustChangePassword ? "Send Authentication Mail" : "Resend Link"
+                        )}
                       </Button>
                     )}
                   </div>
@@ -323,7 +490,7 @@ export default function EmployeeDetailPage() {
                     <div className="flex-1">
                       <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">No User Account Linked</h4>
                       <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        This employee doesn't have a user account yet. Create a user account and assign a role to enable system access.
+                        This employee doesn&lsquo;t have a user account yet. Create a user account and assign a role to enable system access.
                       </p>
                     </div>
                   </div>
@@ -487,6 +654,164 @@ export default function EmployeeDetailPage() {
           </CardContent>
         </Card>
       </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              Organization Structure
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Manager Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Reporting Manager
+                </h4>
+                {employee.manager ? (
+                  <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {employee.manager.firstName} {employee.manager.lastName}
+                      </p>
+                      <Link href={`/dashboard/employees/${employee.manager.id}`}>
+                        <Button variant="ghost" size="sm">
+                          View
+                        </Button>
+                      </Link>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{employee.manager.jobTitle}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500">{employee.manager.userCompEmail}</p>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 text-center">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No manager assigned</p>
+                  </div>
+                )}
+                
+                {showTransferUI ? (
+                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 space-y-3">
+                    <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100">Select New Manager</h5>
+                    <Autocomplete
+                      placeholder="Search for new manager..."
+                      options={managerOptions}
+                      value={selectedNewManager?.id}
+                      onSelect={(option) => setSelectedNewManager(option)}
+                      onSearch={searchManagers}
+                      isLoading={isSearchingManagers}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        setShowTransferUI(false);
+                        setSelectedNewManager(null);
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        disabled={!selectedNewManager || isTransferring}
+                        onClick={handleTransfer}
+                        isLoading={isTransferring}
+                      >
+                        Confirm Transfer
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowTransferUI(true)} className="w-full">
+                    Change Manager (Transfer)
+                  </Button>
+                )}
+              </div>
+
+              {/* Direct Reports Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Direct Reports ({directReports.length})
+                </h4>
+                {isLoadingDirectReports ? (
+                  <div className="text-center py-4">
+                    <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto text-gray-400" />
+                  </div>
+                ) : directReports.length > 0 ? (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                    {directReports.map((report) => (
+                      <Link key={report.id} href={`/dashboard/employees/${report.id}`}>
+                        <div className="p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer group">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {report.firstName} {report.lastName}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{report.jobTitle}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <FileText className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 text-center">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No direct reports</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Card className="border-red-100 dark:border-red-900/30">
+          <CardHeader>
+            <CardTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/30">
+              <div>
+                <h4 className="font-semibold text-red-900 dark:text-red-100">Delete Employee</h4>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  Permanently delete this employee and all associated data. This action cannot be undone.
+                </p>
+              </div>
+              <Button 
+                variant="destructive" 
+                onClick={handleDelete}
+                isLoading={isDeleting}
+              >
+                Delete Employee
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+      <ConfirmDialog
+        isOpen={showResendConfirmDialog}
+        title="Resend Credentials"
+        message="Are you sure you want to reset the password and resend credentials? The user will be required to change their password on the next login."
+        confirmText="Yes, Resend"
+        cancelText="Cancel"
+        onConfirm={confirmResendCredentials}
+        onCancel={() => setShowResendConfirmDialog(false)}
+        variant="default"
+      />
     </div>
   );
 }

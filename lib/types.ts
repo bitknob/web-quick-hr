@@ -14,6 +14,7 @@ export interface User {
   phoneNumber?: string;
   role: UserRole;
   isEmailVerified: boolean;
+  mustChangePassword?: boolean;
   profileImageUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -39,6 +40,33 @@ export interface Employee {
   profileImageUrl?: string;
   createdAt: string;
   updatedAt: string;
+  manager?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    userCompEmail: string;
+    jobTitle: string;
+  };
+}
+
+export interface UserCredentials {
+  email: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+}
+
+export interface CreateEmployeeResponse {
+  employee: Employee;
+  userCredentials: UserCredentials | null;
+}
+
+export interface SuperAdminEmployeeResponse {
+  id: null;
+  userEmail: string;
+  email: string;
+  role: string;
+  isSuperAdmin: boolean;
+  hasEmployeeRecord: boolean;
 }
 
 export interface Company {

@@ -1,5 +1,9 @@
 import { apiClient, ApiResponse } from "../api-client";
-import { Employee } from "../types";
+import {
+  Employee,
+  CreateEmployeeResponse,
+  SuperAdminEmployeeResponse,
+} from "../types";
 
 export interface CreateEmployeeRequest {
   userEmail: string;
@@ -45,8 +49,15 @@ export interface TransferEmployeeRequest {
   newManagerId: string;
 }
 
+export interface BulkAssignManagerRequest {
+  employeeIds: string[];
+  newManagerId: string;
+}
+
 export const employeesApi = {
-  getCurrentEmployee: async (): Promise<ApiResponse<Employee>> => {
+  getCurrentEmployee: async (): Promise<
+    ApiResponse<Employee | SuperAdminEmployeeResponse>
+  > => {
     return apiClient.get("/api/employees/me");
   },
 
@@ -63,20 +74,20 @@ export const employeesApi = {
 
     const queryString = queryParams.toString();
     return apiClient.get(
-      `/api/employees/documents${queryString ? `?${queryString}` : ""}`
+      `/api/employees/documents${queryString ? `?${queryString}` : ""}`,
     );
   },
 
   getCurrentEmployeeDetails: async (
-    companyId?: string
+    companyId?: string,
   ): Promise<ApiResponse<any>> => {
     const queryParams = companyId ? `?companyId=${companyId}` : "";
     return apiClient.get(`/api/employees/details${queryParams}`);
   },
 
   createEmployee: async (
-    data: CreateEmployeeRequest
-  ): Promise<ApiResponse<Employee>> => {
+    data: CreateEmployeeRequest,
+  ): Promise<ApiResponse<CreateEmployeeResponse>> => {
     return apiClient.post("/api/employees", data);
   },
 
@@ -86,7 +97,7 @@ export const employeesApi = {
 
   updateEmployee: async (
     id: string,
-    data: UpdateEmployeeRequest
+    data: UpdateEmployeeRequest,
   ): Promise<ApiResponse<Employee>> => {
     return apiClient.put(`/api/employees/${id}`, data);
   },
@@ -96,7 +107,7 @@ export const employeesApi = {
   },
 
   searchEmployees: async (
-    params: SearchEmployeesParams
+    params: SearchEmployeesParams,
   ): Promise<ApiResponse<Employee[]>> => {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append("page", params.page.toString());
@@ -112,7 +123,7 @@ export const employeesApi = {
 
   getHierarchy: async (
     rootId?: string,
-    companyId?: string
+    companyId?: string,
   ): Promise<ApiResponse<any[]>> => {
     const queryParams = new URLSearchParams();
     if (rootId) queryParams.append("rootId", rootId);
@@ -122,21 +133,43 @@ export const employeesApi = {
   },
 
   getDirectReports: async (
-    managerId: string
+    managerId: string,
   ): Promise<ApiResponse<Employee[]>> => {
     return apiClient.get(`/api/employees/manager/${managerId}/direct-reports`);
   },
 
   getSubordinates: async (
-    managerId: string
+    managerId: string,
   ): Promise<ApiResponse<Employee[]>> => {
     return apiClient.get(`/api/employees/manager/${managerId}/subordinates`);
   },
 
   transferEmployee: async (
     id: string,
-    data: TransferEmployeeRequest
+    data: TransferEmployeeRequest,
   ): Promise<ApiResponse<Employee>> => {
     return apiClient.put(`/api/employees/${id}/transfer`, data);
+  },
+
+  bulkAssignManager: async (
+    data: BulkAssignManagerRequest,
+  ): Promise<
+    ApiResponse<{ successCount: number; failureCount?: number; errors?: any[] }>
+  > => {
+    return apiClient.post("/api/employees/bulk-assign-manager", data);
+  },
+
+  getPotentialManagers: async (
+    id: string,
+    searchTerm?: string,
+    companyId?: string,
+  ): Promise<ApiResponse<Employee[]>> => {
+    const queryParams = new URLSearchParams();
+    if (searchTerm) queryParams.append("searchTerm", searchTerm);
+    if (companyId) queryParams.append("companyId", companyId);
+
+    return apiClient.get(
+      `/api/employees/${id}/potential-managers?${queryParams.toString()}`,
+    );
   },
 };

@@ -1,8 +1,5 @@
 "use client";
 
-import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-
 interface ApprovalFiltersProps {
   onFilterChange: (filters: { status?: string; requestType?: string }) => void;
 }
@@ -23,11 +20,11 @@ const typeOptions = [
 
 export default function ApprovalFilters({ onFilterChange }: ApprovalFiltersProps) {
   return (
-    <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium">Status</label>
+    <div className="flex flex-wrap gap-4 items-center">
+      <div className="flex flex-col gap-1.5 min-w-[150px]">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
         <select
-          className="p-2 border rounded-md min-w-[150px] bg-white dark:bg-gray-800"
+          className="p-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           onChange={(e) => onFilterChange({ status: e.target.value })}
         >
           {statusOptions.map((opt) => (
@@ -38,10 +35,10 @@ export default function ApprovalFilters({ onFilterChange }: ApprovalFiltersProps
         </select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium">Request Type</label>
+      <div className="flex flex-col gap-1.5 min-w-[150px]">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Request Type</label>
         <select
-          className="p-2 border rounded-md min-w-[150px] bg-white dark:bg-gray-800"
+          className="p-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           onChange={(e) => onFilterChange({ requestType: e.target.value })}
         >
           {typeOptions.map((opt) => (

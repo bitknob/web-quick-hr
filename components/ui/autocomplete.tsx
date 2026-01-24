@@ -7,6 +7,8 @@ import { Search, Check, Loader2, X } from "lucide-react";
 import { Input } from "./input";
 import { cn } from "@/lib/utils";
 
+import { useDebounce } from "@/lib/hooks/use-debounce";
+
 export interface AutocompleteOption {
   id: string;
   label: string;
@@ -14,19 +16,11 @@ export interface AutocompleteOption {
   imageUrl?: string;
 }
 
-const getInitials = (name: string): string => {
-  const words = name.trim().split(/\s+/);
-  if (words.length === 1) {
-    return words[0].substring(0, 2).toUpperCase();
-  }
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-};
-
 export interface AutocompleteProps {
   value?: string;
   options: AutocompleteOption[];
   onSelect: (option: AutocompleteOption | null) => void;
-  onSearch?: (searchTerm: string) => void;
+  onSearch?: (term: string) => void;
   placeholder?: string;
   label?: string;
   required?: boolean;
@@ -53,11 +47,18 @@ export function Autocomplete({
 }: AutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [internalValue, setInternalValue] = useState<string | undefined>(value);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const onSearchRef = useRef(onSearch);
+  
+  // Update the ref when onSearch changes
+  useEffect(() => {
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
 
   // Derive selected option from value prop
   const selectedOption = useMemo(() => {
@@ -97,12 +98,13 @@ export function Autocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [selectedOption]);
 
-  // Handle search
+  // Handle search with debounce
   useEffect(() => {
-    if (onSearch && searchTerm && searchTerm !== selectedOption?.label) {
-      onSearch(searchTerm);
+    const currentOnSearch = onSearchRef.current;
+    if (currentOnSearch && debouncedSearchTerm && debouncedSearchTerm !== selectedOption?.label) {
+      currentOnSearch(debouncedSearchTerm);
     }
-  }, [searchTerm, onSearch, selectedOption]);
+  }, [debouncedSearchTerm, selectedOption?.label]);
 
   const handleSelect = useCallback(
     (option: AutocompleteOption) => {
@@ -308,3 +310,12 @@ export function Autocomplete({
   );
 }
 
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}

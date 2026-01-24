@@ -9,7 +9,7 @@ interface AuthState {
   isLoading: boolean;
   hasHydrated: boolean;
   setUser: (user: User | null) => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ mustChangePassword?: boolean }>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   setHasHydrated: (value: boolean) => void;
@@ -31,11 +31,23 @@ export const useAuthStore = create<AuthState>()(
             password,
             deviceType: "web",
           });
-          set({
-            user: response.response.user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          
+          const { user } = response.response;
+          const mustChangePassword = user.mustChangePassword;
+          
+          if (mustChangePassword) {
+            // Don't set user as authenticated if password change is required
+            set({ user, isAuthenticated: false, isLoading: false });
+            return { mustChangePassword: true };
+          } else {
+            // Set user as authenticated
+            set({
+              user,
+              isAuthenticated: true,
+              isLoading: false,
+            });
+            return { mustChangePassword: false };
+          }
         } catch (error) {
           set({ isLoading: false });
           throw error;

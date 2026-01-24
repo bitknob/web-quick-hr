@@ -115,11 +115,14 @@ export default function UploadDocumentPage() {
         const response = await employeesApi.getCurrentEmployee();
         const currentEmp = response.response;
         setCurrentEmployeeId(currentEmp.id);
-        setCurrentCompanyId(currentEmp.companyId);
-        // Set current employee as default selection
-        setValue("employeeId", currentEmp.id);
-        // Add current employee to the list
-        setEmployees([currentEmp]);
+        
+        if ("companyId" in currentEmp) {
+          setCurrentCompanyId(currentEmp.companyId);
+          // Set current employee as default selection
+          setValue("employeeId", currentEmp.id);
+          // Add current employee to the list
+          setEmployees([currentEmp]);
+        }
         setIsLoadingEmployees(false);
       } catch (error) {
         console.error("Failed to fetch current employee:", error);

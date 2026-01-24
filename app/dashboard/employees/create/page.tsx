@@ -6,13 +6,14 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Copy, CheckCircle, AlertTriangle } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
 import { companiesApi } from "@/lib/api/companies";
 import { Company } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -52,6 +53,7 @@ export default function NewEmployeePage() {
     formState: { errors },
     setValue,
     watch,
+    control,
   } = useForm<NewEmployeeFormData>({
     resolver: zodResolver(newEmployeeSchema),
     defaultValues: {
@@ -102,7 +104,8 @@ export default function NewEmployeePage() {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        if (response.response?.companyId) {
+        // Type guard: check if response is an Employee (has companyId) vs SuperAdminEmployeeResponse
+        if (response.response && 'companyId' in response.response && response.response.companyId) {
           setValue("companyId", response.response.companyId);
           // Fetch company details to show in autocomplete
           try {
@@ -129,6 +132,13 @@ export default function NewEmployeePage() {
     fetchCurrentEmployee();
   }, [setValue]);
 
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [employeeCredentials, setEmployeeCredentials] = useState<{
+    email: string;
+    password: string;
+    employeeName: string;
+  } | null>(null);
+
   const handleCompanySelect = (option: AutocompleteOption | null) => {
     if (option) {
       setValue("companyId", option.id, { shouldValidate: true });
@@ -141,6 +151,15 @@ export default function NewEmployeePage() {
 
   const handleCompanySearch = (searchTerm: string) => {
     setCompanySearchTerm(searchTerm);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    addToast({
+      title: "Copied",
+      description: "Copied to clipboard",
+      variant: "success",
+    });
   };
 
   const onSubmit = async (data: NewEmployeeFormData) => {
@@ -162,12 +181,23 @@ export default function NewEmployeePage() {
         hireDate: data.hireDate,
         salary: data.salary || undefined,
       });
-      addToast({
-        title: "Success",
-        description: "Employee created successfully",
-        variant: "success",
-      });
-      router.push(`/dashboard/employees/${response.response.id}`);
+
+      // Check if user credentials were created
+      if (response.response.userCredentials) {
+        setEmployeeCredentials({
+          email: response.response.userCredentials.email,
+          password: response.response.userCredentials.temporaryPassword,
+          employeeName: `${response.response.employee.firstName} ${response.response.employee.lastName}`,
+        });
+        setShowCredentialsModal(true);
+      } else {
+        addToast({
+          title: "Success",
+          description: response.header.responseDetail || "Employee created successfully",
+          variant: "success",
+        });
+        router.push(`/dashboard/employees/${response.response.employee.id}`);
+      }
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       addToast({
@@ -402,12 +432,17 @@ export default function NewEmployeePage() {
                   <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Salary
                   </label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    {...register("salary", { valueAsNumber: true })}
+                  <Controller
+                    name="salary"
+                    control={control}
+                    render={({ field }) => (
+                      <CurrencyInput
+                        id="salary"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="0.00"
+                      />
+                    )}
                   />
                 </div>
               </div>
@@ -429,6 +464,131 @@ export default function NewEmployeePage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Credentials Modal */}
+      {showCredentialsModal && employeeCredentials && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="p-6 space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    Employee Created Successfully!
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    Login credentials have been generated for {employeeCredentials.employeeName}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                      Important Security Information
+                    </h3>
+                    <ul className="mt-2 text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                      <li>• This is a temporary password that will be shown only once</li>
+                      <li>• The employee must change this password on first login</li>
+                      <li>• Share these credentials through a secure channel</li>
+                      <li>• Do not send credentials via unencrypted email</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Email Address
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={employeeCredentials.email}
+                      readOnly
+                      className="flex-1 font-mono bg-gray-50 dark:bg-gray-800"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => copyToClipboard(employeeCredentials.email)}
+                      className="flex-shrink-0"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Temporary Password
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={employeeCredentials.password}
+                      readOnly
+                      className="flex-1 font-mono bg-gray-50 dark:bg-gray-800"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => copyToClipboard(employeeCredentials.password)}
+                      className="flex-shrink-0"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Employee will be required to change this password on first login
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  Next Steps
+                </h3>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>1. Copy the credentials above</li>
+                  <li>2. Share them securely with the employee (in person, encrypted message, or secure portal)</li>
+                  <li>3. Instruct the employee to login and change their password immediately</li>
+                  <li>4. Complete any additional employee onboarding steps</li>
+                </ol>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowCredentialsModal(false);
+                    router.push("/dashboard/employees");
+                  }}
+                  className="flex-1"
+                >
+                  Go to Employees List
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    copyToClipboard(
+                      `Email: ${employeeCredentials.email}\nPassword: ${employeeCredentials.password}`
+                    );
+                  }}
+                  className="flex-shrink-0"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Both
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

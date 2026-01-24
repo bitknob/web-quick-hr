@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,7 +83,7 @@ export default function NewDepartmentPage() {
   };
 
   // Search employees
-  const searchEmployees = async (searchTerm: string) => {
+  const searchEmployees = useCallback(async (searchTerm: string) => {
     if (!searchTerm || searchTerm.length < 2 || !companyId) {
       setEmployeeOptions([]);
       return;
@@ -99,7 +99,7 @@ export default function NewDepartmentPage() {
       const options: AutocompleteOption[] = response.response.map((employee: Employee) => ({
         id: employee.id,
         label: `${employee.firstName} ${employee.lastName}`,
-        subtitle: `${employee.email} - ${employee.jobTitle}`,
+        subtitle: `${employee.userCompEmail || employee.userEmail} - ${employee.jobTitle}`,
       }));
       setEmployeeOptions(options);
     } catch {
@@ -107,7 +107,7 @@ export default function NewDepartmentPage() {
     } finally {
       setIsSearchingEmployees(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     if (debouncedCompanySearch) {
@@ -123,13 +123,14 @@ export default function NewDepartmentPage() {
     } else {
       setEmployeeOptions([]);
     }
-  }, [debouncedEmployeeSearch, companyId]);
+  }, [debouncedEmployeeSearch, companyId, searchEmployees]);
 
   useEffect(() => {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        if (response.response?.companyId) {
+        // Type guard: check if response is an Employee (has companyId) vs SuperAdminEmployeeResponse
+        if (response.response && 'companyId' in response.response && response.response.companyId) {
           setValue("companyId", response.response.companyId);
           try {
             const companyResponse = await companiesApi.getCompany(response.response.companyId);
