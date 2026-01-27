@@ -102,11 +102,15 @@ export default function NewEmployeePage() {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        if (response.response?.companyId) {
-          setValue("companyId", response.response.companyId);
+        const employeeData = response.response;
+
+        if (employeeData && "companyId" in employeeData) {
+          setValue("companyId", employeeData.companyId);
           // Fetch company details to show in autocomplete
           try {
-            const companyResponse = await companiesApi.getCompany(response.response.companyId);
+            const companyResponse = await companiesApi.getCompany(
+              employeeData.companyId
+            );
             const company = companyResponse.response;
             setCompanyOptions([
               {
@@ -167,7 +171,7 @@ export default function NewEmployeePage() {
         description: "Employee created successfully",
         variant: "success",
       });
-      router.push(`/dashboard/employees/${response.response.id}`);
+      router.push(`/dashboard/employees/${response.response.employee.id}`);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       addToast({

@@ -116,12 +116,19 @@ export default function MyDocumentsPage() {
       hasFetchedRef.current = true;
       try {
         const response = await employeesApi.getCurrentEmployee();
-        const employeeId = response.response.id;
-        const companyId = response.response.companyId;
-        setCurrentEmployeeId(employeeId);
-        setCurrentCompanyId(companyId);
-        fetchMyDocuments(employeeId, companyId);
+        const data = response.response;
+
+        if ("companyId" in data) {
+          const employeeId = data.id;
+          const companyId = data.companyId;
+          setCurrentEmployeeId(employeeId);
+          setCurrentCompanyId(companyId);
+          fetchMyDocuments(employeeId, companyId);
+        } else {
+          setIsLoading(false);
+        }
       } catch {
+        setIsLoading(false);
         addToast({
           title: t.toast.error,
           description: t.documents.failedToFetchCompanyInfo,

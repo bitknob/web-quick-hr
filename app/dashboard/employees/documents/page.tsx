@@ -126,9 +126,10 @@ export default function EmployeeDocumentsPage() {
       setIsLoading(true);
       try {
         const response = await employeesApi.getCurrentEmployee();
-        const companyId = response.response.companyId;
-        if (companyId) {
-          setCurrentCompanyId(companyId);
+        const employeeData = response.response;
+
+        if ("companyId" in employeeData && employeeData.companyId) {
+          setCurrentCompanyId(employeeData.companyId);
         } else {
           setIsLoading(false);
           addToast({

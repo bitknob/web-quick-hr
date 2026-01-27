@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Check, X, Zap, Building2, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
 
 const plans = [
@@ -140,18 +141,7 @@ export default function PricingPage() {
               >
                 Monthly
               </span>
-              <button
-                onClick={() => setIsYearly(!isYearly)}
-                className={`relative w-14 h-7 rounded-full transition-colors ${
-                  isYearly ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
-                }`}
-              >
-                <span
-                  className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                    isYearly ? "translate-x-8" : "translate-x-1"
-                  }`}
-                />
-              </button>
+              <Switch checked={isYearly} onCheckedChange={setIsYearly} />
               <span
                 className={`text-sm font-medium ${
                   isYearly

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Zap, Rocket, Building2, Shield, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api-client";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -121,7 +122,7 @@ function CheckoutContent() {
   const currentPlan = plans.find((p) => p.id === selectedPlan) || plans[1];
   const price = billingCycle === "yearly" ? currentPlan.yearlyPrice : currentPlan.monthlyPrice;
 
-  const handlePayment = async () => {
+    const handlePayment = async () => {
     if (!formData.name || !formData.email || !formData.phone) {
       alert("Please fill in all required fields");
       return;
@@ -129,42 +130,82 @@ function CheckoutContent() {
 
     setIsProcessing(true);
 
-    const options = {
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_YOUR_KEY_ID",
-      amount: price * 100,
-      currency: "INR",
-      name: "Quick HR",
-      description: `${currentPlan.name} Plan - ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`,
-      image: "/logo.png",
-      handler: function (response: RazorpayResponse) {
-        window.location.href = `/checkout/success?payment_id=${response.razorpay_payment_id}&plan=${selectedPlan}`;
-      },
-      prefill: {
-        name: formData.name,
-        email: formData.email,
-        contact: formData.phone,
-      },
-      notes: {
-        plan: selectedPlan,
-        billing_cycle: billingCycle,
-        company: formData.company,
-      },
-      theme: {
-        color: "#2563eb",
-      },
-      modal: {
-        ondismiss: function () {
-          setIsProcessing(false);
-        },
-      },
-    };
-
     try {
+      // 1. Create Order
+      const orderResponse = await apiClient.post<any>("/api/payments/orders", {
+        amount: price, // Sending major unit (Rupees)
+        currency: "INR",
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        notes: {
+          plan: selectedPlan,
+          billing_cycle: billingCycle,
+          company: formData.company,
+        },
+      });
+
+      // Handle response structure depending on whether it follows ApiResponse or the direct structure
+      // Based on user doc: { success: true, data: { order: ..., keyId: ... } }
+      // But if it goes through gateway it might return { header: ..., response: { ... } }
+      // We will check for 'data' or 'response' property to be safe, or just trust the response.
+      // Based on typical behavior, apiClient returns the body.
+      const orderData = (orderResponse as any).data || orderResponse.response;
+
+      if (!orderData || !orderData.order) {
+        throw new Error("Invalid order data received from server");
+      }
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency,
+        name: "Quick HR",
+        description: `${currentPlan.name} Plan - ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`,
+        image: "/logo.png",
+        order_id: orderData.order.id, // This is key for backend integration
+        handler: async function (response: RazorpayResponse) {
+          try {
+            // 2. Verify Payment
+            await apiClient.post("/api/payments/verify", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+
+            // Redirect on success
+            window.location.href = `/checkout/success?payment_id=${response.razorpay_payment_id}&plan=${selectedPlan}`;
+          } catch (verifyError) {
+            console.error("Verification failed:", verifyError);
+            alert("Payment verification failed. Please contact support.");
+            setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        notes: {
+          plan: selectedPlan,
+          billing_cycle: billingCycle,
+          company: formData.company,
+        },
+        theme: {
+          color: "#2563eb",
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessing(false);
+          },
+        },
+      };
+
       const razorpay = new window.Razorpay(options);
       razorpay.open();
     } catch (error) {
-      console.error("Razorpay error:", error);
-      alert("Payment initialization failed. Please try again.");
+      console.error("Payment initialization failed:", error);
+      alert("Failed to initialize payment. Please try again.");
       setIsProcessing(false);
     }
   };
