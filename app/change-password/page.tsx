@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,9 +33,11 @@ type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
 export default function ChangePasswordPage() {
   return (
-    <ProtectedRouteChangePassword>
-      <ChangePasswordPageContent />
-    </ProtectedRouteChangePassword>
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProtectedRouteChangePassword>
+        <ChangePasswordPageContent />
+      </ProtectedRouteChangePassword>
+    </Suspense>
   );
 }
 

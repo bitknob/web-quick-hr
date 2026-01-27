@@ -52,9 +52,15 @@ export default function PendingLeavesPage() {
       hasFetchedRef.current = true;
       try {
         const employeeResponse = await employeesApi.getCurrentEmployee();
-        const companyId = employeeResponse.response.companyId;
-        setCurrentCompanyId(companyId);
-        fetchPendingLeaves(companyId);
+        const data = employeeResponse.response;
+        if ("companyId" in data) {
+          const companyId = data.companyId;
+          setCurrentCompanyId(companyId);
+          fetchPendingLeaves(companyId);
+        } else {
+             // Fallback for Super Admin or unexpected structure
+             fetchPendingLeaves();
+        }
       } catch {
         // If we can't get company ID, try fetching without it
         fetchPendingLeaves();

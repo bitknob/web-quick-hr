@@ -195,7 +195,7 @@ export default function EmployeesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-gray-700 dark:text-gray-300">{employee.email}</td>
+                      <td className="py-4 px-4 text-gray-700 dark:text-gray-300">{employee.userCompEmail}</td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">{employee.jobTitle}</td>
                       <td className="py-4 px-4 text-gray-700 dark:text-gray-300">{employee.department}</td>
                       <td className="py-4 px-4">

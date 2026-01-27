@@ -52,7 +52,19 @@ export default function CheckInPage() {
       }
       
       const employee = employeeResponse.response;
-      setCurrentEmployee(employee);
+
+      // Check if user has a valid employee ID (Super Admins have id: null)
+      if (!employee.id) {
+        addToast({
+          title: "Access Restricted",
+          description: "Administrative accounts cannot perform check-ins.",
+          variant: "error",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      setCurrentEmployee(employee as Employee);
 
       // Check if already checked in today
       const today = new Date().toISOString().split("T")[0];

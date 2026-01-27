@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Check, Zap, Rocket, Building2, Shield, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
+import { useToast } from "@/components/ui/toast";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -98,6 +99,7 @@ const plans = [
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan");
+  const { addToast } = useToast();
   
   const [selectedPlan, setSelectedPlan] = useState(planParam || "professional");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
@@ -124,7 +126,11 @@ function CheckoutContent() {
 
     const handlePayment = async () => {
     if (!formData.name || !formData.email || !formData.phone) {
-      alert("Please fill in all required fields");
+      addToast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "error",
+      });
       return;
     }
 
@@ -156,8 +162,21 @@ function CheckoutContent() {
         throw new Error("Invalid order data received from server");
       }
 
+      const keyId = orderData.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+      if (!keyId) {
+          console.error("Missing Razorpay Key ID in response or env");
+          addToast({
+            title: "Configuration Error",
+            description: "Missing Payment Gateway Key",
+            variant: "error",
+          });
+          setIsProcessing(false);
+          return;
+      }
+
       const options = {
-        key: orderData.keyId,
+        key: keyId,
         amount: orderData.order.amount,
         currency: orderData.order.currency,
         name: "Quick HR",
@@ -177,7 +196,11 @@ function CheckoutContent() {
             window.location.href = `/checkout/success?payment_id=${response.razorpay_payment_id}&plan=${selectedPlan}`;
           } catch (verifyError) {
             console.error("Verification failed:", verifyError);
-            alert("Payment verification failed. Please contact support.");
+            addToast({
+              title: "Payment Verification Failed",
+              description: "Please contact support for assistance.",
+              variant: "error",
+            });
             setIsProcessing(false);
           }
         },
@@ -205,7 +228,11 @@ function CheckoutContent() {
       razorpay.open();
     } catch (error) {
       console.error("Payment initialization failed:", error);
-      alert("Failed to initialize payment. Please try again.");
+      addToast({
+        title: "Payment Initialization Failed",
+        description: "Failed to initialize payment. Please try again.",
+        variant: "error",
+      });
       setIsProcessing(false);
     }
   };

@@ -114,7 +114,7 @@ export default function NewTaxDeclarationPage() {
       const options: AutocompleteOption[] = response.response.map((employee: Employee) => ({
         id: employee.id,
         label: `${employee.firstName} ${employee.lastName}`,
-        subtitle: `${employee.email} - ${employee.jobTitle}`,
+        subtitle: `${employee.userCompEmail} - ${employee.jobTitle}`,
       }));
       setEmployeeOptions(options);
     } catch {

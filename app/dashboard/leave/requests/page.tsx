@@ -31,8 +31,15 @@ export default function MyLeaveRequestsPage() {
     setIsLoading(true);
     try {
         const employeeResponse = await employeesApi.getCurrentEmployee();
-        const employeeId = employeeResponse.response.id;
-        const companyId = employeeResponse.response.companyId;
+        const data = employeeResponse.response;
+        
+        if (!("id" in data) || !data.id || !("companyId" in data)) {
+            setIsLoading(false);
+            return;
+        }
+
+        const employeeId = data.id;
+        const companyId = data.companyId;
 
         // Fetch leave requests for current employee
         const response = await leavesApi.getLeavesByEmployee(employeeId, {

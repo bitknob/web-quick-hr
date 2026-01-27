@@ -37,10 +37,10 @@ export default function MarketingLayout({
                 Home
               </Link>
               <Link
-                href="/pricing"
+                href="/contact"
                 className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
-                Pricing
+                Contact
               </Link>
               <Link
                 href="/login"
@@ -48,7 +48,7 @@ export default function MarketingLayout({
               >
                 Login
               </Link>
-              <Link href="/signup">
+              <Link href="/contact">
                 <Button>Get Started</Button>
               </Link>
             </div>
@@ -79,11 +79,11 @@ export default function MarketingLayout({
                 Home
               </Link>
               <Link
-                href="/pricing"
+                href="/contact"
                 className="block text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Pricing
+                Contact
               </Link>
               <Link
                 href="/login"
@@ -92,7 +92,7 @@ export default function MarketingLayout({
               >
                 Login
               </Link>
-              <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
                 <Button className="w-full">Get Started</Button>
               </Link>
             </div>
@@ -122,8 +122,8 @@ export default function MarketingLayout({
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
                 <li>
-                  <Link href="/pricing" className="hover:text-white transition-colors">
-                    Pricing
+                  <Link href="/contact" className="hover:text-white transition-colors">
+                    Contact
                   </Link>
                 </li>
                 <li>

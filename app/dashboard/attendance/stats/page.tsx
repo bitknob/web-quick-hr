@@ -71,7 +71,14 @@ export default function AttendanceStatsPage() {
         if (!hasFetchedEmployeeRef.current) {
           hasFetchedEmployeeRef.current = true;
           const response = await employeesApi.getCurrentEmployee();
-          employee = response.response;
+          const data = response.response;
+          
+          // Check if user is a valid employee (Super Admins have id: null)
+          if (!('id' in data) || !data.id) {
+               setIsLoading(false);
+               return; 
+          }
+          employee = data as Employee;
           setCurrentEmployee(employee);
         } else {
           employee = currentEmployee!;

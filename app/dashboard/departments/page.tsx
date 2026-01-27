@@ -37,8 +37,9 @@ export default function DepartmentsPage() {
       hasFetchedEmployeeRef.current = true;
       try {
         const response = await employeesApi.getCurrentEmployee();
-        if (response.response?.companyId) {
-          setCompanyId(response.response.companyId);
+        const data = response.response;
+        if ("companyId" in data && data.companyId) {
+          setCompanyId(data.companyId);
         }
       } catch {
         // Silently fail - API will auto-filter by user's company
@@ -222,7 +223,7 @@ export default function DepartmentsPage() {
                                 {head.firstName} {head.lastName}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {head.email}
+                                {head.userCompEmail}
                               </div>
                             </div>
                           ) : (

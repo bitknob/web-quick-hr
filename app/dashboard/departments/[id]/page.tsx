@@ -68,7 +68,7 @@ export default function DepartmentDetailPage() {
       const options: AutocompleteOption[] = response.response.map((employee: Employee) => ({
         id: employee.id,
         label: `${employee.firstName} ${employee.lastName}`,
-        subtitle: `${employee.email} - ${employee.jobTitle}`,
+        subtitle: `${employee.userCompEmail} - ${employee.jobTitle}`,
       }));
       setEmployeeOptions(options);
     } catch {
@@ -113,7 +113,7 @@ export default function DepartmentDetailPage() {
             {
               id: head.id,
               label: `${head.firstName} ${head.lastName}`,
-              subtitle: `${head.email} - ${head.jobTitle}`,
+              subtitle: `${head.userCompEmail} - ${head.jobTitle}`,
             },
           ]);
           setEmployeeSearchTerm(`${head.firstName} ${head.lastName}`);

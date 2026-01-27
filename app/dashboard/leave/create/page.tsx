@@ -52,8 +52,11 @@ export default function CreateLeaveRequestPage() {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        setCurrentEmployeeId(response.response.id);
-        setCurrentCompanyId(response.response.companyId);
+        const data = response.response;
+        if ("companyId" in data) {
+          setCurrentEmployeeId(data.id);
+          setCurrentCompanyId(data.companyId);
+        }
       } catch {
         // Silently fail
       }
