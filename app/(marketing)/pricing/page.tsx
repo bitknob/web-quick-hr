@@ -2,12 +2,29 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check, X, Zap, Building2, Rocket } from "lucide-react";
+import { Check, X, Users, HardDrive, Settings, BarChart3, Plug, Shield, Headphones, Palette, Zap, Building2, Rocket, LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { pricingApi } from "@/lib/api/pricing";
+import { PricingPlan } from "@/lib/types/pricing";
+import { useToast } from "@/components/ui/toast";
 
-const plans = [
+// Define the plan interface used in the component
+interface PlanCard {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  description: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  features: Array<{ name: string; included: boolean }>;
+  cta: string;
+  popular: boolean;
+}
+
+// Fallback static plans for when API is not available (updated with INR pricing)
+const fallbackPlans = [
   {
     id: "starter",
     name: "Starter",
@@ -111,6 +128,54 @@ const faqs = [
 
 export default function PricingPage() {
   const [isYearly, setIsYearly] = useState(false);
+  const [plans, setPlans] = useState<PlanCard[]>(fallbackPlans);
+  const [isLoading, setIsLoading] = useState(false); // Start with false since we have fallback data
+  const [error, setError] = useState<string | null>(null);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const fetchPricingPlans = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Only try API if explicitly enabled
+        const shouldTryApi = process.env.NEXT_PUBLIC_API_AVAILABLE === 'true';
+        
+        if (shouldTryApi) {
+          const pricingPlans = await pricingApi.getPricingPlans(true);
+          
+          // Convert API plans to the format expected by the component
+          const convertedPlans = pricingPlans.map((plan: PricingPlan) => ({
+            id: plan.id.toString(),
+            name: plan.name,
+            icon: plan.name.toLowerCase() === 'professional' ? Rocket : 
+                  plan.name.toLowerCase() === 'enterprise' ? Building2 : Zap,
+            description: plan.description,
+            monthlyPrice: plan.monthlyPrice,
+            yearlyPrice: plan.yearlyPrice,
+            features: plan.features,
+            cta: plan.name.toLowerCase() === 'enterprise' ? "Contact Sales" : "Start Free Trial",
+            popular: plan.name.toLowerCase() === 'professional',
+          }));
+          
+          setPlans(convertedPlans);
+        } else {
+          // Use fallback data directly
+          setPlans(fallbackPlans);
+        }
+      } catch (err) {
+        console.error('Failed to fetch pricing plans:', err);
+        setError('Using default pricing plans. API not available yet.');
+        // Keep using fallback plans on error
+        setPlans(fallbackPlans);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPricingPlans();
+  }, []);
 
   return (
     <div className="overflow-hidden">
@@ -158,9 +223,44 @@ export default function PricingPage() {
           </motion.div>
 
           {/* Pricing Cards */}
+          {error && (
+            <div className="mb-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-yellow-800 dark:text-yellow-200 text-sm">{error}</p>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {plans.map((plan, index) => (
-              <motion.div
+            {isLoading ? (
+              // Loading skeleton
+              [1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm animate-pulse"
+                >
+                  <div className="p-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                    </div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-6 w-full"></div>
+                    <div className="mb-6">
+                      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 mb-2"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                    </div>
+                    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-6"></div>
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4, 5].map((j) => (
+                        <div key={j} className="flex items-center gap-3">
+                          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              plans.map((plan: PlanCard, index: number) => (
+                <motion.div
                 key={plan.name}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -214,13 +314,9 @@ export default function PricingPage() {
                     </span>
                   </div>
 
-                  <Link href={`/checkout?plan=${plan.id}`}>
+                  <Link href={index < 2 ? `/subscription?plan=${plan.id}&interval=${isYearly ? 'yearly' : 'monthly'}` : '/contact'}>
                     <Button
-                      className={`w-full mb-6 ${
-                        plan.popular
-                          ? ""
-                          : "bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-gray-200 dark:text-gray-900"
-                      }`}
+                      className="w-full mb-6"
                       variant={plan.popular ? "default" : "secondary"}
                     >
                       {plan.cta}
@@ -228,7 +324,7 @@ export default function PricingPage() {
                   </Link>
 
                   <ul className="space-y-3">
-                    {plan.features.map((feature) => (
+                    {plan.features.map((feature: { name: string; included: boolean }) => (
                       <li
                         key={feature.name}
                         className="flex items-center gap-3 text-sm"
@@ -252,12 +348,12 @@ export default function PricingPage() {
                   </ul>
                 </div>
               </motion.div>
-            ))}
+            )))}
           </div>
         </div>
       </section>
 
-      {/* Feature Comparison */}
+      {/* Feature Comparison - Modern Card Design */}
       <section className="py-20 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -274,95 +370,109 @@ export default function PricingPage() {
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="overflow-x-auto"
-          >
-            <table className="w-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-4 px-6 text-gray-900 dark:text-white font-semibold">
-                    Feature
-                  </th>
-                  <th className="text-center py-4 px-6 text-gray-900 dark:text-white font-semibold">
-                    Starter
-                  </th>
-                  <th className="text-center py-4 px-6 text-gray-900 dark:text-white font-semibold bg-blue-50 dark:bg-blue-900/20">
-                    Professional
-                  </th>
-                  <th className="text-center py-4 px-6 text-gray-900 dark:text-white font-semibold">
-                    Enterprise
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { feature: "Employees", starter: "25", pro: "100", enterprise: "Unlimited" },
-                  { feature: "Document Storage", starter: "5GB", pro: "50GB", enterprise: "Unlimited" },
-                  { feature: "Custom Workflows", starter: false, pro: true, enterprise: true },
-                  { feature: "Advanced Analytics", starter: false, pro: true, enterprise: true },
-                  { feature: "API Access", starter: false, pro: false, enterprise: true },
-                  { feature: "SSO Integration", starter: false, pro: false, enterprise: true },
-                  { feature: "Dedicated Support", starter: false, pro: false, enterprise: true },
-                  { feature: "Custom Branding", starter: false, pro: false, enterprise: true },
-                ].map((row, index) => (
-                  <tr
-                    key={row.feature}
-                    className={
-                      index % 2 === 0
-                        ? "bg-gray-50 dark:bg-gray-900/30"
-                        : "bg-white dark:bg-gray-800"
-                    }
-                  >
-                    <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
-                      {row.feature}
-                    </td>
-                    <td className="text-center py-4 px-6">
-                      {typeof row.starter === "boolean" ? (
-                        row.starter ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Feature Names Column */}
+            <div className="lg:col-span-1">
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Features</h3>
+                <div className="space-y-4">
+                  {[
+                    { icon: Users, name: "Employees" },
+                    { icon: HardDrive, name: "Document Storage" },
+                    { icon: Settings, name: "Custom Workflows" },
+                    { icon: BarChart3, name: "Advanced Analytics" },
+                    { icon: Plug, name: "API Access" },
+                    { icon: Shield, name: "SSO Integration" },
+                    { icon: Headphones, name: "Dedicated Support" },
+                    { icon: Palette, name: "Custom Branding" },
+                  ].map((feature) => (
+                    <div key={feature.name} className="flex items-center gap-3">
+                      <feature.icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {feature.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Cards */}
+            {plans.map((plan, planIndex) => (
+              <div key={plan.id} className="lg:col-span-1">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: planIndex * 0.1 }}
+                  className={`bg-white dark:bg-gray-800 rounded-xl border-2 ${
+                    plan.popular
+                      ? "border-blue-600 dark:border-blue-500 shadow-lg" 
+                      : plan.name.toLowerCase() === "enterprise"
+                      ? "border-purple-600 dark:border-purple-500 shadow-lg"
+                      : "border-gray-200 dark:border-gray-700"
+                  } p-6 h-full`}
+                >
+                  <div className="text-center mb-6">
+                    <h3 className={`text-lg font-bold ${
+                      plan.popular ? "text-blue-600 dark:text-blue-400" : 
+                      plan.name.toLowerCase() === "enterprise" ? "text-purple-600 dark:text-purple-400" : 
+                      "text-gray-900 dark:text-white"
+                    }`}>
+                      {plan.name}
+                    </h3>
+                    {plan.popular && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 mt-2">
+                        Most Popular
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {[
+                      { feature: "Employees", getValue: () => plan.name === "Enterprise" ? "Unlimited" : plan.name === "Professional" ? "100" : "25" },
+                      { feature: "Document Storage", getValue: () => plan.name === "Enterprise" ? "Unlimited" : plan.name === "Professional" ? "50GB" : "5GB" },
+                      { feature: "Custom Workflows", getValue: () => plan.features.find(f => f.name.includes("workflows"))?.included || false },
+                      { feature: "Advanced Analytics", getValue: () => plan.features.find(f => f.name.includes("analytics"))?.included || false },
+                      { feature: "API Access", getValue: () => plan.features.find(f => f.name.includes("API"))?.included || false },
+                      { feature: "SSO Integration", getValue: () => plan.features.find(f => f.name.includes("SSO"))?.included || false },
+                      { feature: "Dedicated Support", getValue: () => plan.features.find(f => f.name.includes("support"))?.included || false },
+                      { feature: "Custom Branding", getValue: () => plan.features.find(f => f.name.includes("branding"))?.included || false },
+                    ].map((item, index) => (
+                      <div key={index} className="flex justify-center items-center min-h-[40px]">
+                        {typeof item.getValue() === "boolean" ? (
+                          item.getValue() ? (
+                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                              <X className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </div>
+                          )
                         ) : (
-                          <X className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {row.starter}
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-center py-4 px-6 bg-blue-50 dark:bg-blue-900/20">
-                      {typeof row.pro === "boolean" ? (
-                        row.pro ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {row.pro}
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-center py-4 px-6">
-                      {typeof row.enterprise === "boolean" ? (
-                        row.enterprise ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {row.enterprise}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </motion.div>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {item.getValue()}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <Link href={plan.name.toLowerCase() === "enterprise" ? '/contact' : `/subscription?plan=${planIndex + 1}&interval=${isYearly ? 'yearly' : 'monthly'}`}>
+                      <Button
+                        className="w-full"
+                        variant={plan.popular ? "default" : plan.name.toLowerCase() === "enterprise" ? "outline" : "secondary"}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </Link>
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

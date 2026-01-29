@@ -205,13 +205,18 @@ export default function ProfilePage() {
                   >
                     Phone Number
                   </label>
-                  <Input
-                    id="phoneNumber"
-                    type="tel"
-                    {...register("phoneNumber")}
-                    disabled
-                    className="bg-gray-50"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 dark:text-gray-100 font-medium text-sm">
+                      +91
+                    </span>
+                    <input
+                      id="phoneNumber"
+                      type="tel"
+                      {...register("phoneNumber")}
+                      disabled
+                      className="flex h-10 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 pl-12 pr-3 py-2 text-sm text-gray-900 dark:text-gray-100 ring-offset-white dark:ring-offset-gray-900 placeholder:text-gray-500 dark:placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
                   {errors.phoneNumber && (
                     <p className="text-sm text-red-500 mt-1">{errors.phoneNumber.message}</p>
                   )}

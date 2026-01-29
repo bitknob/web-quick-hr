@@ -300,6 +300,15 @@ class ApiClient {
     return response.data;
   }
 
+  async patch<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig,
+  ): Promise<ApiResponse<T>> {
+    const response = await this.client.patch<ApiResponse<T>>(url, data, config);
+    return response.data;
+  }
+
   async postFormData<T>(
     url: string,
     formData: FormData,

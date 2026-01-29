@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function MarketingLayout({
   children,
@@ -48,7 +49,8 @@ export default function MarketingLayout({
               >
                 Login
               </Link>
-              <Link href="/contact">
+              <ThemeToggle />
+              <Link href="/pricing">
                 <Button>Get Started</Button>
               </Link>
             </div>
@@ -92,7 +94,10 @@ export default function MarketingLayout({
               >
                 Login
               </Link>
-              <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
+              <div className="pt-2">
+                <ThemeToggle />
+              </div>
+              <Link href="/pricing" onClick={() => setMobileMenuOpen(false)}>
                 <Button className="w-full">Get Started</Button>
               </Link>
             </div>

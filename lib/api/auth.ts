@@ -6,6 +6,21 @@ export interface SignupRequest {
   password: string;
   phoneNumber?: string;
   role: string;
+  // Extended fields for company creation
+  companyEmail?: string;
+  companyName?: string;
+  firstName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  department?: string;
+  hireDate?: string;
+}
+
+export interface CreateUserForEmployeeRequest {
+  email: string;
+  phoneNumber?: string;
+  role?: string;
+  companyName?: string;
 }
 
 export interface LoginRequest {
@@ -71,7 +86,11 @@ export const authApi = {
       "/api/auth/login",
       data,
     );
-    if (response.response.accessToken) {
+    // Only set tokens if response contains them (successful login)
+    // 401 response for auto-creation won't have tokens but apiClient format might wrap it.
+    // However, apiClient generally throws for non-2xx unless configured otherwise.
+    // If 401 is returned as success body (unlikely for standard REST) or if we need to catch it.
+    if (response.response && response.response.accessToken) {
       apiClient.setToken(response.response.accessToken);
       apiClient.setRefreshToken(response.response.refreshToken);
     }
@@ -157,9 +176,15 @@ export const authApi = {
     );
   },
 
+  createUserForEmployee: async (
+    data: CreateUserForEmployeeRequest,
+  ): Promise<ApiResponse<{ user: User; temporaryPassword: string }>> => {
+    return apiClient.post("/api/auth/create-user-for-employee", data);
+  },
+
   resendCredentials: async (
     email: string,
-    companyName?: string,
+    companyName: string,
   ): Promise<
     ApiResponse<{ temporaryPassword: string; mustChangePassword: boolean }>
   > => {

@@ -204,13 +204,23 @@ export default function ContactPage() {
              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Phone number
              </label>
-             <input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-             />
+             <div className="relative">
+               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-900 dark:text-white font-medium">
+                 +91
+               </span>
+               <input
+                 id="phone"
+                 type="tel"
+                 value={formData.phone}
+                 onChange={(e) => {
+                   const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                   setFormData({ ...formData, phone: value });
+                 }}
+                 className="w-full pl-14 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                 placeholder="98765 43210"
+                 maxLength={10}
+               />
+             </div>
           </div>
 
           <div className="relative">

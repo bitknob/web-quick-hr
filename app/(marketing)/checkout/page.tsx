@@ -14,31 +14,32 @@ interface RazorpayResponse {
   razorpay_signature?: string;
 }
 
-declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayOptions) => { open: () => void };
-  }
-}
-
 interface RazorpayOptions {
-  key: string;
-  amount: number;
-  currency: string;
+  key: any;
+  amount: any;
+  currency: any;
   name: string;
   description: string;
   image?: string;
-  handler: (response: RazorpayResponse) => void;
-  prefill: {
+  order_id?: any;
+  subscription_id?: string;
+  handler: (response: RazorpayResponse) => void | Promise<void>;
+  prefill?: {
     name: string;
     email: string;
     contact: string;
   };
-  notes: Record<string, string>;
-  theme: {
+  notes?: Record<string, string>;
+  theme?: {
     color: string;
   };
   modal?: {
     ondismiss: () => void;
+  };
+  config?: {
+    display: {
+      language: string;
+    };
   };
 }
 
@@ -143,7 +144,7 @@ function CheckoutContent() {
         currency: "INR",
         customerName: formData.name,
         customerEmail: formData.email,
-        customerPhone: formData.phone,
+        customerPhone: `+91${formData.phone}`,
         notes: {
           plan: selectedPlan,
           billing_cycle: billingCycle,
@@ -207,7 +208,7 @@ function CheckoutContent() {
         prefill: {
           name: formData.name,
           email: formData.email,
-          contact: formData.phone,
+          contact: `+91${formData.phone}`,
         },
         notes: {
           plan: selectedPlan,
@@ -224,7 +225,7 @@ function CheckoutContent() {
         },
       };
 
-      const razorpay = new window.Razorpay(options);
+      const razorpay = new window.Razorpay(options as any);
       razorpay.open();
     } catch (error) {
       console.error("Payment initialization failed:", error);
@@ -396,13 +397,23 @@ function CheckoutContent() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Phone Number *
                   </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="+91 98765 43210"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-900 dark:text-white font-medium">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => {
+                        // Only allow numbers and limit to 10 digits
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setFormData({ ...formData, phone: value });
+                      }}
+                      className="w-full pl-14 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="98765 43210"
+                      maxLength={10}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

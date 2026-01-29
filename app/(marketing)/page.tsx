@@ -137,7 +137,7 @@ export default function LandingPage() {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Link href="/contact">
+              <Link href="/pricing">
                 <Button size="lg" className="text-lg px-8 py-6">
                   Get Started
                   <ArrowRight className="ml-2 w-5 h-5" />
@@ -299,7 +299,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/contact"
+                href="/pricing"
                 className="inline-flex items-center justify-center bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-4 rounded-lg font-medium shadow-lg transition-all duration-200"
               >
                 Get Started

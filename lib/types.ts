@@ -74,9 +74,11 @@ export interface Company {
   name: string;
   code: string;
   description?: string;
-  hrbpId?: string;
   profileImageUrl?: string;
+  hrbpId?: string;
   status: "active" | "inactive";
+  subscriptionStatus?: "trial" | "active" | "inactive" | "expired";
+  subscriptionEndsAt?: string;
   createdAt: string;
   updatedAt: string;
 }
