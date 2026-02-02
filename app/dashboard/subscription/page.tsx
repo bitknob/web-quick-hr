@@ -44,60 +44,11 @@ export default function SubscriptionPage() {
   useEffect(() => {
     const fetchPricingPlans = async () => {
         try {
-          // Use mock data for now since backend API is not implemented
-          const mockPlans = [
-            {
-              id: 1,
-              name: "Starter",
-              monthlyPrice: 999,
-              yearlyPrice: 9999,
-              features: [
-                { name: "25 Employees", included: true },
-                { name: "5GB Document Storage", included: true },
-                { name: "Custom Workflows", included: false },
-                { name: "Advanced Analytics", included: false },
-                { name: "API Access", included: false },
-                { name: "SSO Integration", included: false },
-                { name: "Dedicated Support", included: false },
-                { name: "Custom Branding", included: false },
-              ]
-            },
-            {
-              id: 2,
-              name: "Professional",
-              monthlyPrice: 2999,
-              yearlyPrice: 29999,
-              features: [
-                { name: "100 Employees", included: true },
-                { name: "50GB Document Storage", included: true },
-                { name: "Custom Workflows", included: true },
-                { name: "Advanced Analytics", included: true },
-                { name: "API Access", included: false },
-                { name: "SSO Integration", included: false },
-                { name: "Dedicated Support", included: false },
-                { name: "Custom Branding", included: false },
-              ]
-            },
-            {
-              id: 3,
-              name: "Enterprise",
-              monthlyPrice: 9999,
-              yearlyPrice: 99999,
-              features: [
-                { name: "Unlimited Employees", included: true },
-                { name: "Unlimited Document Storage", included: true },
-                { name: "Custom Workflows", included: true },
-                { name: "Advanced Analytics", included: true },
-                { name: "API Access", included: true },
-                { name: "SSO Integration", included: true },
-                { name: "Dedicated Support", included: true },
-                { name: "Custom Branding", included: true },
-              ]
-            }
-          ];
-          setAvailablePlans(mockPlans);
+          // Fetch pricing plans from API
+          const plans = await pricingApi.getPricingPlans(true);
+          setAvailablePlans(plans);
         } catch (error) {
-          console.error("Failed to fetch pricing plans:", error);
+          console.error("Error fetching pricing plans:", error);
           addToast({
             title: "Error",
             description: "Failed to load pricing plans",
@@ -106,7 +57,7 @@ export default function SubscriptionPage() {
         } finally {
           setLoading(false);
         }
-      };
+    };
 
     fetchPricingPlans();
   }, [addToast]);

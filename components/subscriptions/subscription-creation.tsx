@@ -7,30 +7,29 @@ import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { PasswordInput } from "@/components/ui/password-strength";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { 
-  CreditCard, 
-  Calendar, 
   CheckCircle, 
-  AlertTriangle,
-  ExternalLink,
   Shield,
   Zap
 } from "lucide-react";
 import { CreateSubscriptionRequest, CreateSubscriptionResponse } from "@/lib/types/subscription";
 import { subscriptionApi } from "@/lib/api/subscriptions";
-import { useToast } from "@/components/ui/toast";
 
 const subscriptionSchema = z.object({
   pricingPlanId: z.number().min(1, "Please select a pricing plan"),
   interval: z.enum(["monthly", "yearly"]),
-  customerName: z.string().min(1, "Customer name is required").max(100, "Name must be less than 100 characters"),
-  customerEmail: z.string().email("Please enter a valid email address"),
-  customerContact: z.string().min(10, "Contact number must be at least 10 digits").regex(/^[+]?[\d\s-()]+$/, "Please enter a valid contact number"),
+  firstName: z.string().min(1, "First name is required").max(50, "First name must be less than 50 characters"),
+  lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
+  personalEmail: z.string().email("Please enter a valid personal email address"),
+  companyEmail: z.string().email("Please enter a valid company email address"),
   companyName: z.string().min(1, "Company name is required").max(100, "Company name must be less than 100 characters"),
-  billingAddress: z.string().min(5, "Billing address is required").max(200, "Billing address must be less than 200 characters"),
+  companyCode: z.string().min(2, "Company code must be at least 2 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  contact: z.string().min(10, "Contact number must be at least 10 digits").regex(/^[+]?[\d\s-()]+$/, "Please enter a valid contact number"),
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionSchema>;
@@ -43,14 +42,14 @@ interface SubscriptionCreationProps {
     yearlyPrice: number;
     features: Array<{ name: string; included: boolean }>;
   }>;
-  initialPlanId?: number | null;
+  initialPlanId?: number;
   initialInterval?: "monthly" | "yearly";
   onSuccess?: (subscription: CreateSubscriptionResponse) => void;
   onCancel?: () => void;
   createAccount?: boolean;
 }
 
-export function SubscriptionCreation({ 
+export default function SubscriptionCreation({
   availablePlans, 
   initialPlanId,
   initialInterval,
@@ -60,7 +59,9 @@ export function SubscriptionCreation({
 }: SubscriptionCreationProps) {
   const [loading, setLoading] = useState(false);
   const [createdSubscription, setCreatedSubscription] = useState<CreateSubscriptionResponse | null>(null);
-  const { addToast } = useToast();
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState("");
 
   const {
     register,
@@ -73,9 +74,14 @@ export function SubscriptionCreation({
     defaultValues: {
       pricingPlanId: initialPlanId || 0,
       interval: initialInterval || "monthly",
-      customerName: "",
-      customerEmail: "",
-      customerContact: "",
+      firstName: "",
+      lastName: "",
+      personalEmail: "",
+      companyEmail: "",
+      companyName: "",
+      companyCode: "",
+      password: "",
+      contact: "",
     },
   });
 
@@ -87,71 +93,49 @@ export function SubscriptionCreation({
     try {
       setLoading(true);
 
-      // For new user signups, we need to create a company first
-      // For now, we'll use a placeholder companyId
-      // TODO: Backend needs to implement company creation endpoint or accept company data in subscription request
-      const tempCompanyId = `new-company-${Date.now()}`;
-
-      // Create subscription with the companyId
+      // Create subscription with the new API structure
       const subscriptionData: CreateSubscriptionRequest = {
-        companyId: tempCompanyId,
         pricingPlanId: data.pricingPlanId,
         customerData: {
-          name: data.customerName,
-          email: data.customerEmail,
-          contact: data.customerContact,
+          name: `${data.firstName} ${data.lastName}`,
+          personalEmail: data.personalEmail,
+          companyEmail: data.companyEmail,
+          companyName: data.companyName,
+          companyCode: data.companyCode,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          password: data.password,
+          contact: data.contact,
         },
         interval: data.interval,
       };
 
       const validationErrors = subscriptionApi.validateSubscriptionData(subscriptionData);
       if (validationErrors.length > 0) {
-        addToast({
-          title: "Validation Error",
-          description: validationErrors.join(", "),
-          variant: "error",
-        });
+        setDialogMessage(validationErrors.join(", "));
+        setShowErrorDialog(true);
         return;
       }
 
-      // Create subscription using the existing API
+      // Create subscription using the updated API
       const response = await subscriptionApi.createSubscription(subscriptionData);
       setCreatedSubscription(response);
 
-      addToast({
-        title: "Success",
-        description: "Subscription created with 14-day free trial",
-        variant: "success",
-      });
+      setDialogMessage("Subscription created with 14-day free trial");
+      setShowSuccessDialog(true);
 
-      onSuccess?.(response);
+      // Pass both subscription response and customer data to success callback
+      onSuccess?.({
+        ...response,
+        customerData: subscriptionData.customerData
+      });
     } catch (error) {
       console.error("Failed to create subscription:", error);
-      addToast({
-        title: "Error",
-        description: "Failed to create subscription. Please try again.",
-        variant: "error",
-      });
+      setDialogMessage("Failed to create subscription. Please try again.");
+      setShowErrorDialog(true);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePaymentRedirect = () => {
-    if (createdSubscription?.paymentLink?.short_url) {
-      window.open(createdSubscription.paymentLink.short_url, '_blank');
-    }
-  };
-
-  const getPlanPrice = (plan: {
-    id: number;
-    name: string;
-    monthlyPrice: number;
-    yearlyPrice: number;
-    features: Array<{ name: string; included: boolean }>;
-  }, interval: string) => {
-    if (!plan) return 0;
-    return interval === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
   };
 
   const formatPrice = (price: number) => {
@@ -164,8 +148,6 @@ export function SubscriptionCreation({
   };
 
   const getYearlySavings = (plan: {
-    id: number;
-    name: string;
     monthlyPrice: number;
     yearlyPrice: number;
     features: Array<{ name: string; included: boolean }>;
@@ -183,311 +165,286 @@ export function SubscriptionCreation({
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
-          
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Subscription Created Successfully!
+            Subscription Created!
           </h2>
-          
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Your 14-day free trial has started. Add your payment details to continue service after the trial ends.
+            Your 14-day free trial has started. You can start using all features immediately.
           </p>
-
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-              Subscription Details
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              Trial Details
             </h3>
-            <div className="space-y-2 text-left">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Plan:</span>
-                <span className="font-medium">{selectedPlan?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Billing:</span>
-                <span className="font-medium capitalize">{selectedInterval}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Trial Period:</span>
-                <span className="font-medium">14 days</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Trial Ends:</span>
-                <span className="font-medium">
-                  {subscriptionApi.formatDate(createdSubscription.trialEndDate)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Amount:</span>
-                <span className="font-medium">
-                  {formatPrice(getPlanPrice(selectedPlan || { id: 0, name: '', monthlyPrice: 0, yearlyPrice: 0, features: [] }, selectedInterval))}/{selectedInterval}
-                </span>
-              </div>
-            </div>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Trial ends on {new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+            </p>
           </div>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={handlePaymentRedirect}
-              className="flex-1"
-            >
-              <CreditCard className="w-4 h-4 mr-2" />
-              Add Payment Method
-            </Button>
-            <Button
-              variant="outline"
-              onClick={onCancel}
-            >
-              Close
-            </Button>
-          </div>
+          <Button onClick={() => onSuccess?.(createdSubscription)}>
+            Continue to Dashboard
+          </Button>
         </div>
       </Card>
     );
   }
 
   return (
-    <Card className="max-w-2xl mx-auto">
-      <div className="p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+    <>
+      <Card className="max-w-2xl mx-auto">
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Complete Your Subscription
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Fill in your details to start your free trial
+            </p>
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Start Your Free Trial
-          </h2>
-          
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Get 14 days of full access to all features. No credit card required to start.
-          </p>
 
-          <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <Zap className="w-4 h-4" />
-            <span>14-day free trial • Cancel anytime</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Selected Plan Summary */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Selected Plan
-            </label>
-            <div className="border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-              {selectedPlan && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      {selectedPlan.name}
-                      {selectedPlan.name.toLowerCase().includes("professional") && (
-                        <Badge className="ml-2 bg-blue-600 text-white text-xs">
-                          Popular
-                        </Badge>
-                      )}
-                    </h3>
-                    
-                    <div className="mb-3">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatPrice(getPlanPrice(selectedPlan, selectedInterval))}
-                      </span>
-                      <span className="text-gray-600 dark:text-gray-400">/{selectedInterval}</span>
-                      
-                      {selectedInterval === "yearly" && (
-                        <div className="text-sm text-green-600 dark:text-green-400 mt-1">
-                          Save {getYearlySavings(selectedPlan)}% with yearly billing
-                        </div>
-                      )}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Plan Selection */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Selected Plan
+              </h3>
+              {selectedPlan ? (
+                <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {selectedPlan.name}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedInterval === "monthly" ? "Monthly" : "Yearly"} billing
+                      </p>
                     </div>
-
-                    <div className="space-y-1">
-                      {selectedPlan.features.slice(0, 3).map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          {feature.included ? (
-                            <CheckCircle className="w-3 h-3 text-green-500" />
-                          ) : (
-                            <div className="w-3 h-3 border border-gray-300 rounded-full" />
-                          )}
-                          <span className={feature.included ? "text-gray-700 dark:text-gray-300" : "text-gray-400"}>
-                            {feature.name}
-                          </span>
-                        </div>
-                      ))}
-                      {selectedPlan.features.length > 3 && (
-                        <div className="text-sm text-gray-500">
-                          +{selectedPlan.features.length - 3} more features
-                        </div>
-                      )}
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {formatPrice(
+                          selectedInterval === "monthly" 
+                            ? selectedPlan.monthlyPrice 
+                            : selectedPlan.yearlyPrice
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedInterval === "monthly" ? "/month" : "/year"}
+                      </div>
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div className="border border-red-300 rounded-lg p-4 bg-red-50 dark:bg-red-900/20">
+                  <p className="text-red-600 dark:text-red-400">
+                    Please select a plan to continue
+                  </p>
+                </div>
               )}
-              
-              {/* Hidden field to store the selected plan */}
               <input
                 type="hidden"
                 {...register("pricingPlanId")}
                 value={selectedPlanId}
               />
+              <input
+                type="hidden"
+                {...register("interval")}
+                value={selectedInterval}
+              />
             </div>
-          </div>
 
-          {/* Billing Interval Display */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Billing Interval
-            </label>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-900 dark:text-white font-medium capitalize">
-                  {selectedInterval}
-                </span>
-                {selectedInterval === "yearly" && (
-                  <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs">
-                    Save 17%
-                  </Badge>
-                )}
-              </div>
-            </div>
-            
-            {/* Hidden field to store the selected interval */}
-            <input
-              type="hidden"
-              {...register("interval")}
-              value={selectedInterval}
-            />
-          </div>
-
-          {/* Customer Information */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Customer Information
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Full Name *
-                </label>
-                <Input
-                  {...register("customerName")}
-                  placeholder="John Doe"
-                  className={errors.customerName ? "border-red-500" : ""}
-                />
-                {errors.customerName && (
-                  <p className="text-red-500 text-xs mt-1">{errors.customerName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email Address *
-                </label>
-                <Input
-                  {...register("customerEmail")}
-                  type="email"
-                  placeholder="john@example.com"
-                  className={errors.customerEmail ? "border-red-500" : ""}
-                />
-                {errors.customerEmail && (
-                  <p className="text-red-500 text-xs mt-1">{errors.customerEmail.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Company Name *
-                </label>
-                <Input
-                  {...register("companyName")}
-                  placeholder="Acme Corp"
-                  className={errors.companyName ? "border-red-500" : ""}
-                />
-                {errors.companyName && (
-                  <p className="text-red-500 text-xs mt-1">{errors.companyName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Phone Number
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-md">
-                    +91
-                  </span>
+            {/* Customer Information */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Account Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    First Name *
+                  </label>
                   <Input
-                    {...register("customerContact")}
-                    placeholder="98765 43210"
-                    className={`rounded-l-none ${errors.customerContact ? "border-red-500" : ""}`}
+                    {...register("firstName")}
+                    placeholder="John"
+                    className={errors.firstName ? "border-red-500" : ""}
+                  />
+                  {errors.firstName && (
+                    <p className="text-red-500 text-xs mt-1">{errors.firstName.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Last Name *
+                  </label>
+                  <Input
+                    {...register("lastName")}
+                    placeholder="Doe"
+                    className={errors.lastName ? "border-red-500" : ""}
+                  />
+                  {errors.lastName && (
+                    <p className="text-red-500 text-xs mt-1">{errors.lastName.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Personal Email *
+                  </label>
+                  <Input
+                    {...register("personalEmail")}
+                    type="email"
+                    placeholder="john@gmail.com"
+                    className={errors.personalEmail ? "border-red-500" : ""}
+                  />
+                  {errors.personalEmail && (
+                    <p className="text-red-500 text-xs mt-1">{errors.personalEmail.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">For your account login (gmail, yahoo, etc.)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Company Email *
+                  </label>
+                  <Input
+                    {...register("companyEmail")}
+                    type="email"
+                    placeholder="john@company.com"
+                    className={errors.companyEmail ? "border-red-500" : ""}
+                  />
+                  {errors.companyEmail && (
+                    <p className="text-red-500 text-xs mt-1">{errors.companyEmail.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">For business operations</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Company Name *
+                  </label>
+                  <Input
+                    {...register("companyName")}
+                    placeholder="Acme Corporation"
+                    className={errors.companyName ? "border-red-500" : ""}
+                  />
+                  {errors.companyName && (
+                    <p className="text-red-500 text-xs mt-1">{errors.companyName.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Company Code *
+                  </label>
+                  <Input
+                    {...register("companyCode")}
+                    placeholder="ACME2024"
+                    className={errors.companyCode ? "border-red-500" : ""}
+                  />
+                  {errors.companyCode && (
+                    <p className="text-red-500 text-xs mt-1">{errors.companyCode.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Unique company identifier (min. 2 characters, no maximum limit)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Password *
+                  </label>
+                  <PasswordInput
+                    value={watch("password")}
+                    onChange={(value) => setValue("password", value)}
+                    placeholder="Create a strong password"
+                    error={errors.password?.message}
+                    showStrengthMeter={true}
+                    showRequirements={true}
+                    id="password"
                   />
                 </div>
-                {errors.customerContact && (
-                  <p className="text-red-500 text-xs mt-1">{errors.customerContact.message}</p>
-                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Phone Number
+                  </label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-md">
+                      +91
+                    </span>
+                    <Input
+                      {...register("contact")}
+                      placeholder="98765 43210"
+                      className={`rounded-l-none ${errors.contact ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {errors.contact && (
+                    <p className="text-red-500 text-xs mt-1">{errors.contact.message}</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Billing Address
-              </label>
-              <Input
-                {...register("billingAddress")}
-                placeholder="123 Main St, City, State 12345"
-                className={errors.billingAddress ? "border-red-500" : ""}
-              />
-              {errors.billingAddress && (
-                <p className="text-red-500 text-xs mt-1">{errors.billingAddress.message}</p>
-              )}
+            {/* Trial Information */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+              <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                14-Day Free Trial
+              </h4>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                Start using all features immediately. Your trial will end on{" "}
+                {new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+              </p>
             </div>
-          </div>
 
-          {/* Trial Information */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
-            <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
-              14-Day Free Trial
-            </h4>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              Start using all features immediately. Your trial will end on{" "}
-              {new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}. No payment required during trial.
-            </p>
-          </div>
+            {/* Action Buttons */}
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={loading}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1"
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Creating Subscription...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Start Free Trial
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Creating Subscription...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Start Free Trial
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </Card>
+      {/* Success Dialog */}
+      <ConfirmDialog
+        open={showSuccessDialog}
+        title="Success!"
+        message={dialogMessage}
+        confirmText="OK"
+        onConfirm={() => setShowSuccessDialog(false)}
+        onOpenChange={(open) => !open && setShowSuccessDialog(false)}
+      />
+
+      {/* Error Dialog */}
+      <ConfirmDialog
+        open={showErrorDialog}
+        title="Error"
+        message={dialogMessage}
+        confirmText="OK"
+        onConfirm={() => setShowErrorDialog(false)}
+        onOpenChange={(open) => !open && setShowErrorDialog(false)}
+      />
+    </>
   );
 }
-
-export default SubscriptionCreation;

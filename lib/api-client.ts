@@ -6,7 +6,7 @@ import axios, {
 } from "axios";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:9400";
+  process.env.NEXT_PUBLIC_API_URL;
 const API_LOG_ENABLED =
   process.env.NEXT_PUBLIC_API_LOG_ENABLED === "true" ||
   process.env.NEXT_PUBLIC_API_LOG_ENABLED === "1";

@@ -44,30 +44,30 @@ export const companiesApi = {
     if (params?.subscriptionStatus) queryParams.append("subscriptionStatus", params.subscriptionStatus);
 
     const queryString = queryParams.toString();
-    return apiClient.get(`/companies${queryString ? `?${queryString}` : ""}`);
+    return apiClient.get(`/api/companies${queryString ? `?${queryString}` : ""}`);
   },
 
   getCompany: async (id: string): Promise<ApiResponse<Company>> => {
-    return apiClient.get(`/companies/${id}`);
+    return apiClient.get(`/api/companies/${id}`);
   },
 
   createCompany: async (data: CreateCompanyRequest): Promise<ApiResponse<Company>> => {
-    return apiClient.post("/companies", data);
+    return apiClient.post("/api/companies", data);
   },
 
   updateCompany: async (id: string, data: UpdateCompanyRequest): Promise<ApiResponse<Company>> => {
-    return apiClient.put(`/companies/${id}`, data);
+    return apiClient.put(`/api/companies/${id}`, data);
   },
 
   deleteCompany: async (id: string): Promise<ApiResponse<null>> => {
-    return apiClient.delete(`/companies/${id}`);
+    return apiClient.delete(`/api/companies/${id}`);
   },
 
   uploadProfileImage: async (companyId: string, imageFile: File): Promise<ApiResponse<CompanyProfileImageResponse>> => {
     const formData = new FormData();
     formData.append('image', imageFile);
     
-    return apiClient.postFormData(`/companies/${companyId}/upload-profile-image`, formData);
+    return apiClient.postFormData(`/api/companies/${companyId}/upload-profile-image`, formData);
   },
 
   // Helper method to validate company data

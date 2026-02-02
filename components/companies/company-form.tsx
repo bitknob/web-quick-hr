@@ -7,8 +7,9 @@ import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Company } from "@/lib/types";
 import { companiesApi, CreateCompanyRequest, UpdateCompanyRequest } from "@/lib/api/companies";
 import { useToast } from "@/components/ui/toast";
@@ -37,6 +38,9 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { addToast } = useToast();
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState("");
 
   const {
     register,
@@ -66,21 +70,15 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        addToast({
-          title: "Error",
-          description: "Please select an image file",
-          variant: "error",
-        });
+        setDialogMessage("Please select an image file");
+        setShowErrorDialog(true);
         return;
       }
 
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        addToast({
-          title: "Error", 
-          description: "Image size must be less than 5MB",
-          variant: "error",
-        });
+        setDialogMessage("Image size must be less than 5MB");
+        setShowErrorDialog(true);
         return;
       }
 
@@ -108,11 +106,8 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
       // Validate data
       const validationErrors = companiesApi.validateCompanyData(data);
       if (validationErrors.length > 0) {
-        addToast({
-          title: "Validation Error",
-          description: validationErrors.join(", "),
-          variant: "error",
-        });
+        setDialogMessage(validationErrors.join(", "));
+        setShowErrorDialog(true);
         return;
       }
 
@@ -140,35 +135,23 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
       if (imageFile) {
         try {
           await companiesApi.uploadProfileImage(result.id, imageFile);
-          addToast({
-            title: "Success",
-            description: `Company ${company ? 'updated' : 'created'} and image uploaded successfully`,
-            variant: "success",
-          });
+          setDialogMessage(`Company ${company ? 'updated' : 'created'} and image uploaded successfully`);
+          setShowSuccessDialog(true);
         } catch (imageError) {
           console.error("Failed to upload image:", imageError);
-          addToast({
-            title: "Warning",
-            description: `Company ${company ? 'updated' : 'created'} but image upload failed`,
-            variant: "warning",
-          });
+          setDialogMessage(`Company ${company ? 'updated' : 'created'} but image upload failed`);
+          setShowErrorDialog(true);
         }
       } else {
-        addToast({
-          title: "Success",
-          description: `Company ${company ? 'updated' : 'created'} successfully`,
-          variant: "success",
-        });
+        setDialogMessage(`Company ${company ? 'updated' : 'created'} successfully`);
+        setShowSuccessDialog(true);
       }
 
       onSuccess?.(result);
     } catch (error) {
       console.error("Failed to save company:", error);
-      addToast({
-        title: "Error",
-        description: `Failed to ${company ? 'update' : 'create'} company`,
-        variant: "error",
-      });
+      setDialogMessage(`Failed to ${company ? 'update' : 'create'} company`);
+      setShowErrorDialog(true);
     } finally {
       setLoading(false);
     }
@@ -319,45 +302,111 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
                 className={errors.subscriptionEndsAt ? "border-red-500" : ""}
               />
               {errors.subscriptionEndsAt && (
-                <p className="text-red-500 text-xs mt-1">{errors.subscriptionEndsAt.message}</p>
-              )}
-            </div>
           )}
+        </div>
 
-          {/* HRBP ID */}
+        {/* Status and Subscription */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              HRBP ID
+              Status
             </label>
-            <Input
-              {...register("hrbpId")}
-              placeholder="Enter HRBP user ID"
-            />
+            <Select {...register("status")} className={errors.status ? "border-red-500" : ""}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </Select>
+            {errors.status && (
+              <p className="text-red-500 text-xs mt-1">{errors.status.message}</p>
+            )}
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  {company ? "Updating..." : "Creating..."}
-                </>
-              ) : (
-                company ? "Update Company" : "Create Company"
-              )}
-            </Button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Subscription Status
+            </label>
+            <Select {...register("subscriptionStatus")} className={errors.subscriptionStatus ? "border-red-500" : ""}>
+              <option value="trial">Trial</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="expired">Expired</option>
+            </Select>
+            {errors.subscriptionStatus && (
+              <p className="text-red-500 text-xs mt-1">{errors.subscriptionStatus.message}</p>
+            )}
           </div>
-        </form>
-      </div>
-    </Card>
-  );
-}
+        </div>
+
+        {/* Subscription End Date */}
+        {(subscriptionStatus === "trial" || subscriptionStatus === "active") && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Subscription End Date
+            </label>
+            <Input
+              type="date"
+              {...register("subscriptionEndsAt")}
+              className={errors.subscriptionEndsAt ? "border-red-500" : ""}
+            />
+            {errors.subscriptionEndsAt && (
+              <p className="text-red-500 text-xs mt-1">{errors.subscriptionEndsAt.message}</p>
+            )}
+          </div>
+        )}
+
+        {/* HRBP ID */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            HRBP ID
+          </label>
+          <Input
+            {...register("hrbpId")}
+            placeholder="Enter HRBP user ID"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading} className="flex-1">
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                {company ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              company ? "Update Company" : "Create Company"
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
+  </Card>
+
+  {/* Success Dialog */}
+  <ConfirmDialog
+    open={showSuccessDialog}
+    title="Success!"
+    message={dialogMessage}
+    confirmText="OK"
+    onConfirm={() => setShowSuccessDialog(false)}
+    onOpenChange={(open) => !open && setShowSuccessDialog(false)}
+  />
+
+  {/* Error Dialog */}
+  <ConfirmDialog
+    open={showErrorDialog}
+    title="Error"
+    message={dialogMessage}
+    confirmText="OK"
+    onConfirm={() => setShowErrorDialog(false)}
+    onOpenChange={(open) => !open && setShowErrorDialog(false)}
+  />
+</>

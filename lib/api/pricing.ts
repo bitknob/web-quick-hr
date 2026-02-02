@@ -15,31 +15,43 @@ class PricingApi {
       params.append('activeOnly', 'true');
     }
     
-    const response = await apiClient.get<PricingPlansResponse>(`/pricing-plans?${params.toString()}`);
-    return response.response.response.pricingPlans;
+    const response = await apiClient.get<PricingPlansResponse>(`/api/pricing-plans?${params.toString()}`);
+    console.log('API Response:', JSON.stringify(response, null, 2));
+    
+    // Try different access patterns
+    if (response.response?.response?.pricingPlans) {
+      return response.response.response.pricingPlans;
+    } else if (response.response?.pricingPlans) {
+      return response.response.pricingPlans;
+    } else if (response.pricingPlans) {
+      return response.pricingPlans;
+    } else {
+      console.error('Unable to find pricingPlans in response. Response structure:', response);
+      throw new Error('Invalid API response structure');
+    }
   }
 
   async getPricingPlan(id: number): Promise<PricingPlan> {
-    const response = await apiClient.get<PricingPlanResponse>(`/pricing-plans/${id}`);
+    const response = await apiClient.get<PricingPlanResponse>(`/api/pricing-plans/${id}`);
     return response.response.response.pricingPlan;
   }
 
   async createPricingPlan(plan: CreatePricingPlanRequest): Promise<PricingPlan> {
-    const response = await apiClient.post<PricingPlanResponse>('/pricing-plans', plan);
+    const response = await apiClient.post<PricingPlanResponse>('/api/pricing-plans', plan);
     return response.response.response.pricingPlan;
   }
 
   async updatePricingPlan(id: number, plan: UpdatePricingPlanRequest): Promise<PricingPlan> {
-    const response = await apiClient.put<PricingPlanResponse>(`/pricing-plans/${id}`, plan);
+    const response = await apiClient.put<PricingPlanResponse>(`/api/pricing-plans/${id}`, plan);
     return response.response.response.pricingPlan;
   }
 
   async deletePricingPlan(id: number): Promise<void> {
-    await apiClient.delete<ApiResponse<null>>(`/pricing-plans/${id}`);
+    await apiClient.delete<ApiResponse<null>>(`/api/pricing-plans/${id}`);
   }
 
   async togglePricingPlanStatus(id: number): Promise<PricingPlan> {
-    const response = await apiClient.patch<PricingPlanResponse>(`/pricing-plans/${id}/toggle`);
+    const response = await apiClient.patch<PricingPlanResponse>(`/api/pricing-plans/${id}/toggle`);
     return response.response.response.pricingPlan;
   }
 

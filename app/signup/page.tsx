@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PasswordInput } from "@/components/ui/password-strength";
 import { authApi } from "@/lib/api/auth";
 import { useToast } from "@/components/ui/toast";
 import { getErrorMessage } from "@/lib/utils";
@@ -45,6 +46,8 @@ export default function SignupPage() {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<SignupFormData>({
     resolver: zodResolver(refinedSignupSchema),
     defaultValues: {
@@ -287,16 +290,15 @@ export default function SignupPage() {
                       <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Password
                       </label>
-                      <Input
+                      <PasswordInput
+                        value={watch("password") || ""}
+                        onChange={(value) => setValue("password", value)}
+                        placeholder="Create a strong password"
+                        error={errors.password?.message}
+                        showStrengthMeter={true}
+                        showRequirements={true}
                         id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        {...register("password")}
-                        className={errors.password ? "border-red-500" : ""}
                       />
-                      {errors.password && (
-                        <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
-                      )}
                     </motion.div>
 
                     <motion.div

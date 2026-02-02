@@ -8,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
 import { pricingApi } from "@/lib/api/pricing";
 import { PricingPlan } from "@/lib/types/pricing";
-import { useToast } from "@/components/ui/toast";
 
 // Define the plan interface used in the component
 interface PlanCard {
@@ -22,76 +21,6 @@ interface PlanCard {
   cta: string;
   popular: boolean;
 }
-
-// Fallback static plans for when API is not available (updated with INR pricing)
-const fallbackPlans = [
-  {
-    id: "starter",
-    name: "Starter",
-    icon: Zap,
-    description: "Perfect for small teams getting started with HR management.",
-    monthlyPrice: 2499,
-    yearlyPrice: 24990,
-    features: [
-      { name: "Up to 25 employees", included: true },
-      { name: "Employee directory", included: true },
-      { name: "Leave management", included: true },
-      { name: "Basic attendance tracking", included: true },
-      { name: "Email support", included: true },
-      { name: "Document storage (5GB)", included: true },
-      { name: "Custom workflows", included: false },
-      { name: "Advanced analytics", included: false },
-      { name: "API access", included: false },
-      { name: "SSO integration", included: false },
-    ],
-    cta: "Start Free Trial",
-    popular: false,
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    icon: Rocket,
-    description: "For growing companies that need more power and flexibility.",
-    monthlyPrice: 6499,
-    yearlyPrice: 64990,
-    features: [
-      { name: "Up to 100 employees", included: true },
-      { name: "Employee directory", included: true },
-      { name: "Leave management", included: true },
-      { name: "Advanced attendance tracking", included: true },
-      { name: "Priority email & chat support", included: true },
-      { name: "Document storage (50GB)", included: true },
-      { name: "Custom workflows", included: true },
-      { name: "Advanced analytics", included: true },
-      { name: "API access", included: false },
-      { name: "SSO integration", included: false },
-    ],
-    cta: "Start Free Trial",
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    icon: Building2,
-    description: "For large organizations with complex HR requirements.",
-    monthlyPrice: 16499,
-    yearlyPrice: 164990,
-    features: [
-      { name: "Unlimited employees", included: true },
-      { name: "Employee directory", included: true },
-      { name: "Leave management", included: true },
-      { name: "Advanced attendance tracking", included: true },
-      { name: "24/7 dedicated support", included: true },
-      { name: "Unlimited document storage", included: true },
-      { name: "Custom workflows", included: true },
-      { name: "Advanced analytics", included: true },
-      { name: "API access", included: true },
-      { name: "SSO integration", included: true },
-    ],
-    cta: "Contact Sales",
-    popular: false,
-  },
-];
 
 const faqs = [
   {
@@ -128,10 +57,9 @@ const faqs = [
 
 export default function PricingPage() {
   const [isYearly, setIsYearly] = useState(false);
-  const [plans, setPlans] = useState<PlanCard[]>(fallbackPlans);
-  const [isLoading, setIsLoading] = useState(false); // Start with false since we have fallback data
+  const [plans, setPlans] = useState<PlanCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { addToast } = useToast();
 
   useEffect(() => {
     const fetchPricingPlans = async () => {
@@ -139,36 +67,27 @@ export default function PricingPage() {
         setIsLoading(true);
         setError(null);
         
-        // Only try API if explicitly enabled
-        const shouldTryApi = process.env.NEXT_PUBLIC_API_AVAILABLE === 'true';
+        const pricingPlans = await pricingApi.getPricingPlans(true);
         
-        if (shouldTryApi) {
-          const pricingPlans = await pricingApi.getPricingPlans(true);
-          
-          // Convert API plans to the format expected by the component
-          const convertedPlans = pricingPlans.map((plan: PricingPlan) => ({
-            id: plan.id.toString(),
-            name: plan.name,
-            icon: plan.name.toLowerCase() === 'professional' ? Rocket : 
-                  plan.name.toLowerCase() === 'enterprise' ? Building2 : Zap,
-            description: plan.description,
-            monthlyPrice: plan.monthlyPrice,
-            yearlyPrice: plan.yearlyPrice,
-            features: plan.features,
-            cta: plan.name.toLowerCase() === 'enterprise' ? "Contact Sales" : "Start Free Trial",
-            popular: plan.name.toLowerCase() === 'professional',
-          }));
-          
-          setPlans(convertedPlans);
-        } else {
-          // Use fallback data directly
-          setPlans(fallbackPlans);
-        }
+        // Convert API plans to the format expected by the component
+        const convertedPlans = pricingPlans.map((plan: PricingPlan) => ({
+          id: plan.id.toString(),
+          name: plan.name,
+          icon: plan.name.toLowerCase() === 'professional' ? Rocket : 
+                plan.name.toLowerCase() === 'enterprise' ? Building2 : Zap,
+          description: plan.description,
+          monthlyPrice: plan.monthlyPrice,
+          yearlyPrice: plan.yearlyPrice,
+          features: plan.features,
+          cta: plan.name.toLowerCase() === 'enterprise' ? "Contact Sales" : "Start Free Trial",
+          popular: plan.name.toLowerCase() === 'professional',
+        }));
+        
+        setPlans(convertedPlans);
       } catch (err) {
         console.error('Failed to fetch pricing plans:', err);
-        setError('Using default pricing plans. API not available yet.');
-        // Keep using fallback plans on error
-        setPlans(fallbackPlans);
+        setError('Failed to load pricing plans. Please try again later.');
+        setPlans([]);
       } finally {
         setIsLoading(false);
       }

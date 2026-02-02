@@ -23,23 +23,32 @@ export interface GetDepartmentsParams {
 }
 
 export const departmentsApi = {
-  getDepartments: async (params?: GetDepartmentsParams): Promise<ApiResponse<Department[]>> => {
+  getDepartments: async (
+    params?: GetDepartmentsParams,
+  ): Promise<ApiResponse<Department[]>> => {
     const queryParams = new URLSearchParams();
     if (params?.companyId) queryParams.append("companyId", params.companyId);
 
     const queryString = queryParams.toString();
-    return apiClient.get(`/api/departments${queryString ? `?${queryString}` : ""}`);
+    return apiClient.get(
+      `/api/departments${queryString ? `?${queryString}` : ""}`,
+    );
   },
 
   getDepartment: async (id: string): Promise<ApiResponse<Department>> => {
     return apiClient.get(`/api/departments/${id}`);
   },
 
-  createDepartment: async (data: CreateDepartmentRequest): Promise<ApiResponse<Department>> => {
+  createDepartment: async (
+    data: CreateDepartmentRequest,
+  ): Promise<ApiResponse<Department>> => {
     return apiClient.post("/api/departments", data);
   },
 
-  updateDepartment: async (id: string, data: UpdateDepartmentRequest): Promise<ApiResponse<Department>> => {
+  updateDepartment: async (
+    id: string,
+    data: UpdateDepartmentRequest,
+  ): Promise<ApiResponse<Department>> => {
     return apiClient.put(`/api/departments/${id}`, data);
   },
 
@@ -51,8 +60,15 @@ export const departmentsApi = {
     return apiClient.get(`/api/departments/${id}/sub-departments`);
   },
 
-  getTopLevelDepartments: async (companyId: string): Promise<ApiResponse<Department[]>> => {
-    return apiClient.get(`/api/departments/top-level/list?companyId=${companyId}`);
+  getTopLevelDepartments: async (
+    companyId?: string,
+  ): Promise<ApiResponse<Department[]>> => {
+    const queryParams = new URLSearchParams();
+    if (companyId) queryParams.append("companyId", companyId);
+
+    const queryString = queryParams.toString();
+    return apiClient.get(
+      `/api/departments/top-level/list${queryString ? `?${queryString}` : ""}`,
+    );
   },
 };
-

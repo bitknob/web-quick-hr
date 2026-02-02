@@ -11,7 +11,8 @@ import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
 import { ArrowLeft, Save, Copy, CheckCircle, AlertTriangle } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
 import { companiesApi } from "@/lib/api/companies";
-import { Company } from "@/lib/types";
+import { departmentsApi } from "@/lib/api/departments";
+import { Company, Department } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,15 +26,15 @@ const newEmployeeSchema = z.object({
   employeeId: z.string().min(1, "Employee ID is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  userCompEmail: z.string().email("Invalid email address").optional(),
+  userCompEmail: z.string().email("Invalid email address").min(1, "Company email is required"),
   phoneNumber: z.string().optional(),
-  dateOfBirth: z.string().optional(),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
   address: z.string().optional(),
   jobTitle: z.string().min(1, "Job title is required"),
   department: z.string().min(1, "Department is required"),
   managerId: z.string().optional(),
   hireDate: z.string().min(1, "Hire date is required"),
-  salary: z.number().optional(),
+  salary: z.number().min(0, "Salary must be a positive number"),
 });
 
 type NewEmployeeFormData = z.infer<typeof newEmployeeSchema>;
@@ -46,6 +47,12 @@ export default function NewEmployeePage() {
   const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
   const [companySearchTerm, setCompanySearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(companySearchTerm, 300);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [showCrossCompanyDialog, setShowCrossCompanyDialog] = useState(false);
+  const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const {
     register,
@@ -106,6 +113,7 @@ export default function NewEmployeePage() {
         const response = await employeesApi.getCurrentEmployee();
         // Type guard: check if response is an Employee (has companyId) vs SuperAdminEmployeeResponse
         if (response.response && 'companyId' in response.response && response.response.companyId) {
+          setUserCompanyId(response.response.companyId); // Store user's company ID
           setValue("companyId", response.response.companyId);
           // Fetch company details to show in autocomplete
           try {
@@ -132,6 +140,28 @@ export default function NewEmployeePage() {
     fetchCurrentEmployee();
   }, [setValue]);
 
+  // Fetch departments when component mounts or companyId changes
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setIsLoadingDepartments(true);
+      try {
+        console.log('Fetching departments for companyId:', companyId);
+        const response = await departmentsApi.getDepartments(
+          companyId ? { companyId } : undefined
+        );
+        console.log('Departments fetched:', response.response);
+        setDepartments(response.response || []);
+      } catch (error) {
+        console.error("Failed to fetch departments:", error);
+        setDepartments([]);
+      } finally {
+        setIsLoadingDepartments(false);
+      }
+    };
+
+    fetchDepartments();
+  }, [companyId]);
+
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [employeeCredentials, setEmployeeCredentials] = useState<{
     email: string;
@@ -141,11 +171,45 @@ export default function NewEmployeePage() {
 
   const handleCompanySelect = (option: AutocompleteOption | null) => {
     if (option) {
-      setValue("companyId", option.id, { shouldValidate: true });
-      setCompanySearchTerm(option.label);
+      // Check if user is selecting a different company
+      if (userCompanyId && option.id !== userCompanyId) {
+        setPendingCompanyId(option.id);
+        setShowCrossCompanyDialog(true);
+      } else {
+        setValue("companyId", option.id, { shouldValidate: true });
+        setCompanySearchTerm(option.label);
+        setRequiresApproval(false);
+      }
     } else {
       setValue("companyId", "", { shouldValidate: true });
       setCompanySearchTerm("");
+      setRequiresApproval(false);
+    }
+  };
+
+  const handleCrossCompanyConfirm = () => {
+    if (pendingCompanyId) {
+      setValue("companyId", pendingCompanyId, { shouldValidate: true });
+      const selectedCompany = companyOptions.find(c => c.id === pendingCompanyId);
+      if (selectedCompany) {
+        setCompanySearchTerm(selectedCompany.label);
+      }
+      setRequiresApproval(true);
+      setShowCrossCompanyDialog(false);
+      setPendingCompanyId(null);
+    }
+  };
+
+  const handleCrossCompanyCancel = () => {
+    setShowCrossCompanyDialog(false);
+    setPendingCompanyId(null);
+    // Reset to user's company if they had one
+    if (userCompanyId) {
+      setValue("companyId", userCompanyId, { shouldValidate: true });
+      const userCompany = companyOptions.find(c => c.id === userCompanyId);
+      if (userCompany) {
+        setCompanySearchTerm(userCompany.label);
+      }
     }
   };
 
@@ -340,7 +404,7 @@ export default function NewEmployeePage() {
 
                 <div>
                   <label htmlFor="userCompEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Company Email
+                    Company Email <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="userCompEmail"
@@ -352,9 +416,6 @@ export default function NewEmployeePage() {
                   {errors.userCompEmail && (
                     <p className="text-sm text-red-500 mt-1">{errors.userCompEmail.message}</p>
                   )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Optional company-specific email address
-                  </p>
                 </div>
 
                 <div>
@@ -383,13 +444,17 @@ export default function NewEmployeePage() {
 
                 <div>
                   <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Date of Birth
+                    Date of Birth <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="dateOfBirth"
                     type="date"
                     {...register("dateOfBirth")}
+                    className={errors.dateOfBirth ? "border-red-500" : ""}
                   />
+                  {errors.dateOfBirth && (
+                    <p className="text-sm text-red-500 mt-1">{errors.dateOfBirth.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -420,11 +485,23 @@ export default function NewEmployeePage() {
                   <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Department <span className="text-red-500">*</span>
                   </label>
-                  <Input
+                  <select
                     id="department"
                     {...register("department")}
-                    className={errors.department ? "border-red-500" : ""}
-                  />
+                    className={`flex h-10 w-full rounded-lg border-2 ${
+                      errors.department ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                    } bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ring-offset-white dark:ring-offset-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:border-blue-500 dark:focus-visible:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm hover:border-gray-400 dark:hover:border-gray-500`}
+                    disabled={isLoadingDepartments}
+                  >
+                    <option value="">
+                      {isLoadingDepartments ? "Loading departments..." : "Select a department"}
+                    </option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
                   {errors.department && (
                     <p className="text-sm text-red-500 mt-1">{errors.department.message}</p>
                   )}
@@ -443,7 +520,7 @@ export default function NewEmployeePage() {
 
                 <div>
                   <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Salary
+                    Salary <span className="text-red-500">*</span>
                   </label>
                   <Controller
                     name="salary"
@@ -477,6 +554,86 @@ export default function NewEmployeePage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Approval Required Section */}
+      {requiresApproval && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                Approval Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    Cross-Company Employee Creation
+                  </h4>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                    You are creating an employee for a different company. This action requires approval from the target company's administrator.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Your Company</p>
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                        {companyOptions.find(c => c.id === userCompanyId)?.label || "Your Company"}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <p className="text-xs text-purple-600 dark:text-purple-400 mb-1">Target Company</p>
+                      <p className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                        {companyOptions.find(c => c.id === companyId)?.label || "Selected Company"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-100 dark:bg-amber-900/30 rounded-lg p-4 border border-amber-300 dark:border-amber-700">
+                  <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    What happens next?
+                  </h4>
+                  <ol className="space-y-2 text-sm text-amber-800 dark:text-amber-200">
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 dark:bg-amber-700 text-white flex items-center justify-center text-xs font-bold">1</span>
+                      <span>When you submit this form, an approval request will be created</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 dark:bg-amber-700 text-white flex items-center justify-center text-xs font-bold">2</span>
+                      <span>The target company's administrator will be notified</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 dark:bg-amber-700 text-white flex items-center justify-center text-xs font-bold">3</span>
+                      <span>Once approved, the employee will be created in their system</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 dark:bg-amber-700 text-white flex items-center justify-center text-xs font-bold">4</span>
+                      <span>You will receive a notification about the approval status</span>
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    The employee record will be in <strong>pending</strong> status until approved by the target company.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Credentials Modal */}
       {showCredentialsModal && employeeCredentials && (
@@ -596,6 +753,67 @@ export default function NewEmployeePage() {
                 >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Both
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Cross-Company Confirmation Dialog */}
+      {showCrossCompanyDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full"
+          >
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-amber-100 dark:bg-amber-900/20 rounded-full">
+                  <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    Cross-Company Employee Creation
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
+                    You are about to create an employee for a different company
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                  Important Notice
+                </h3>
+                <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1">
+                  <li>• This action requires approval from the target company's administrator</li>
+                  <li>• The employee will be in pending status until approved</li>
+                  <li>• You will be notified once the request is reviewed</li>
+                </ul>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>Target Company:</strong>{" "}
+                  {companyOptions.find(c => c.id === pendingCompanyId)?.label || "Selected Company"}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={handleCrossCompanyCancel}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCrossCompanyConfirm}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  Yes, Continue
                 </Button>
               </div>
             </div>

@@ -1,19 +1,16 @@
 export interface CustomerData {
   name: string;
-  email: string;
-  contact: string;
+  personalEmail: string;
+  companyEmail: string;
+  companyName: string;
+  companyCode: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  contact?: string;
 }
 
 export interface CreateSubscriptionRequest {
-  companyId: string;
-  pricingPlanId: number;
-  customerData: CustomerData;
-  interval: "monthly" | "yearly";
-}
-
-export interface CreateSubscriptionWithCompanyRequest {
-  companyName: string;
-  billingAddress: string;
   pricingPlanId: number;
   customerData: CustomerData;
   interval: "monthly" | "yearly";
@@ -31,9 +28,9 @@ export interface Subscription {
   status: "trial" | "active" | "paused" | "expired" | "cancelled";
   trialStartDate?: string;
   trialEndDate?: string;
-  isTrialActive: boolean;
+  isTrialActive?: boolean;
   remainingTrialDays?: number;
-  needsPayment: boolean;
+  needsPayment?: boolean;
   amount: number;
   currency: string;
   interval: "monthly" | "yearly";
@@ -52,9 +49,10 @@ export interface PaymentLink {
 
 export interface CreateSubscriptionResponse {
   subscription: Subscription;
-  paymentLink: PaymentLink;
+  paymentLink: PaymentLink | null;
   trialDays: number;
   trialEndDate: string;
+  message: string;
 }
 
 export interface SubscriptionStatusResponse {
@@ -86,7 +84,7 @@ export interface PricingPlan {
 
 export interface WebhookEvent {
   event: string;
-  payload: any;
+  payload: Record<string, unknown>;
   signature?: string;
 }
 

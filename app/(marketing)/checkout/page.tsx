@@ -3,10 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Zap, Rocket, Building2, Shield, CreditCard } from "lucide-react";
+import { Check, Zap, Rocket, Building2, Shield, CreditCard, LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
+import { pricingApi } from "@/lib/api/pricing";
+import { PricingPlan } from "@/lib/types/pricing";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -43,59 +45,17 @@ interface RazorpayOptions {
   };
 }
 
-const plans = [
-  {
-    id: "starter",
-    name: "Starter",
-    icon: Zap,
-    description: "Perfect for small teams getting started with HR management.",
-    monthlyPrice: 2499,
-    yearlyPrice: 24990,
-    features: [
-      "Up to 25 employees",
-      "Employee directory",
-      "Leave management",
-      "Basic attendance tracking",
-      "Email support",
-      "Document storage (5GB)",
-    ],
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    icon: Rocket,
-    description: "For growing companies that need more power and flexibility.",
-    monthlyPrice: 6499,
-    yearlyPrice: 64990,
-    features: [
-      "Up to 100 employees",
-      "Everything in Starter",
-      "Advanced attendance tracking",
-      "Priority email & chat support",
-      "Document storage (50GB)",
-      "Custom workflows",
-      "Advanced analytics",
-    ],
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    icon: Building2,
-    description: "For large organizations with complex HR requirements.",
-    monthlyPrice: 16499,
-    yearlyPrice: 164990,
-    features: [
-      "Unlimited employees",
-      "Everything in Professional",
-      "24/7 dedicated support",
-      "Unlimited document storage",
-      "API access",
-      "SSO integration",
-      "Custom branding",
-    ],
-  },
-];
+interface PlanCard {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  description: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  features: string[];
+  popular?: boolean;
+}
+
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -105,12 +65,46 @@ function CheckoutContent() {
   const [selectedPlan, setSelectedPlan] = useState(planParam || "professional");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [plans, setPlans] = useState<PlanCard[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     company: "",
     phone: "",
   });
+
+  // Fetch pricing plans from API
+  useEffect(() => {
+    const fetchPricingPlans = async () => {
+      try {
+        setIsLoadingPlans(true);
+        const pricingPlans = await pricingApi.getPricingPlans(true);
+        
+        // Convert API plans to the format expected by the component
+        const convertedPlans: PlanCard[] = pricingPlans.map((plan: PricingPlan) => ({
+          id: plan.id.toString(),
+          name: plan.name,
+          icon: plan.name.toLowerCase() === 'professional' ? Rocket : 
+                plan.name.toLowerCase() === 'enterprise' ? Building2 : Zap,
+          description: plan.description,
+          monthlyPrice: plan.monthlyPrice,
+          yearlyPrice: plan.yearlyPrice,
+          features: plan.features.filter(f => f.included).map(f => f.name),
+          popular: plan.name.toLowerCase() === 'professional',
+        }));
+        
+        setPlans(convertedPlans);
+      } catch (err) {
+        console.error('Failed to fetch pricing plans:', err);
+        setPlans([]);
+      } finally {
+        setIsLoadingPlans(false);
+      }
+    };
+
+    fetchPricingPlans();
+  }, []);
 
   useEffect(() => {
     const script = document.createElement("script");

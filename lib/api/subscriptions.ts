@@ -1,13 +1,10 @@
 import { 
   Subscription, 
   CreateSubscriptionRequest,
-  CreateSubscriptionWithCompanyRequest,
   UpdateSubscriptionRequest,
   CreateSubscriptionResponse,
   SubscriptionStatusResponse,
   SubscriptionResponse,
-  SubscriptionsResponse,
-  WebhookEvent,
   ApiResponse,
   SubscriptionStatus,
   CustomerData,
@@ -23,14 +20,13 @@ class SubscriptionApi {
     return response.response;
   }
 
-  // Create subscription with company (for new user signups)
-  async createSubscriptionWithCompany(data: CreateSubscriptionWithCompanyRequest): Promise<CreateSubscriptionResponse> {
-    const response = await apiClient.post<CreateSubscriptionResponse>('/api/subscriptions/with-company', data);
+  async getSubscription(companyId: string): Promise<SubscriptionResponse> {
+    const response = await apiClient.get<SubscriptionResponse>(`/api/subscriptions/${companyId}`);
     return response.response;
   }
 
-  async getSubscription(companyId: string): Promise<SubscriptionResponse> {
-    const response = await apiClient.get<SubscriptionResponse>(`/api/subscriptions/${companyId}`);
+  async getSubscriptionById(subscriptionId: number): Promise<CreateSubscriptionResponse> {
+    const response = await apiClient.get<ApiResponse<CreateSubscriptionResponse>>(`/api/subscriptions/${subscriptionId}`);
     return response.response;
   }
 
@@ -48,28 +44,21 @@ class SubscriptionApi {
     await apiClient.delete<ApiResponse<null>>(`/api/subscriptions/${companyId}`);
   }
 
+  // Pause subscription
   async pauseSubscription(companyId: string): Promise<SubscriptionResponse> {
     const response = await apiClient.patch<SubscriptionResponse>(`/api/subscriptions/${companyId}/pause`);
     return response.response;
   }
 
+  // Resume subscription
   async resumeSubscription(companyId: string): Promise<SubscriptionResponse> {
     const response = await apiClient.patch<SubscriptionResponse>(`/api/subscriptions/${companyId}/resume`);
     return response.response;
   }
 
-  async getAllSubscriptions(): Promise<SubscriptionsResponse> {
-    const response = await apiClient.get<SubscriptionsResponse>('/api/subscriptions');
-    return response.response;
-  }
-
-  // Webhook handling
-  async handleWebhook(event: WebhookEvent): Promise<void> {
-    await apiClient.post<ApiResponse<null>>('/api/subscriptions/webhook', event);
-  }
-
-  async processWebhook(event: WebhookEvent): Promise<void> {
-    await apiClient.post<ApiResponse<null>>('/api/subscriptions/webhook', event);
+  // Webhook handler
+  async handleWebhook(webhookData: unknown): Promise<void> {
+    await apiClient.post<ApiResponse<null>>('/api/subscriptions/webhook', webhookData);
   }
 
   // Helper methods for subscription management
@@ -240,13 +229,9 @@ class SubscriptionApi {
     };
   }
 
-  // Validation helpers
+  // Validation helpers for new API structure
   validateSubscriptionData(data: CreateSubscriptionRequest): string[] {
     const errors: string[] = [];
-    
-    if (!data.companyId || data.companyId.trim().length === 0) {
-      errors.push('Company ID is required');
-    }
     
     if (!data.pricingPlanId || data.pricingPlanId <= 0) {
       errors.push('Valid pricing plan ID is required');
@@ -255,59 +240,49 @@ class SubscriptionApi {
     if (!data.customerData) {
       errors.push('Customer data is required');
     } else {
-      if (!data.customerData.name || data.customerData.name.trim().length === 0) {
-        errors.push('Customer name is required');
+      // Validate personal email (allows gmail, yahoo, etc.)
+      if (!data.customerData.personalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerData.personalEmail)) {
+        errors.push('Valid personal email is required');
       }
       
-      if (!data.customerData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerData.email)) {
-        errors.push('Valid customer email is required');
+      // Validate company email (business email)
+      if (!data.customerData.companyEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerData.companyEmail)) {
+        errors.push('Valid company email is required');
       }
       
-      if (!data.customerData.contact || !/^[+]?[\d\s-()]+$/.test(data.customerData.contact)) {
-        errors.push('Valid customer contact number is required');
+      // Validate company name
+      if (!data.customerData.companyName || data.customerData.companyName.trim().length === 0) {
+        errors.push('Company name is required');
+      }
+      
+      // Validate company code (minimum 2 characters)
+      if (!data.customerData.companyCode || data.customerData.companyCode.trim().length < 2) {
+        errors.push('Company code is required (minimum 2 characters)');
+      }
+      
+      // Validate first name
+      if (!data.customerData.firstName || data.customerData.firstName.trim().length === 0) {
+        errors.push('First name is required');
+      }
+      
+      // Validate last name
+      if (!data.customerData.lastName || data.customerData.lastName.trim().length === 0) {
+        errors.push('Last name is required');
+      }
+      
+      // Validate password (minimum 6 characters)
+      if (!data.customerData.password || data.customerData.password.length < 6) {
+        errors.push('Password must be at least 6 characters long');
+      }
+      
+      // Validate contact (optional but if provided, must be valid)
+      if (data.customerData.contact && !/^[+]?[\d\s-()]+$/.test(data.customerData.contact)) {
+        errors.push('Valid contact number is required');
       }
     }
     
     if (!data.interval || !['monthly', 'yearly'].includes(data.interval)) {
       errors.push('Valid billing interval is required (monthly or yearly)');
-    }
-    
-    return errors;
-  }
-
-  validateSubscriptionWithCompanyData(data: CreateSubscriptionWithCompanyRequest): string[] {
-    const errors: string[] = [];
-    
-    if (!data.companyName || data.companyName.trim().length === 0) {
-      errors.push('Company name is required');
-    }
-    
-    if (!data.billingAddress || data.billingAddress.trim().length === 0) {
-      errors.push('Billing address is required');
-    }
-    
-    if (!data.pricingPlanId || data.pricingPlanId <= 0) {
-      errors.push('Valid pricing plan ID is required');
-    }
-    
-    if (!data.customerData) {
-      errors.push('Customer data is required');
-    } else {
-      if (!data.customerData.name || data.customerData.name.trim().length === 0) {
-        errors.push('Customer name is required');
-      }
-      
-      if (!data.customerData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerData.email)) {
-        errors.push('Valid customer email is required');
-      }
-      
-      if (!data.customerData.contact || !/^[+]?[\d\s-()]+$/.test(data.customerData.contact)) {
-        errors.push('Valid customer contact number is required');
-      }
-    }
-    
-    if (!data.interval || !['monthly', 'yearly'].includes(data.interval)) {
-      errors.push('Valid billing interval (monthly/yearly) is required');
     }
     
     return errors;
@@ -333,7 +308,7 @@ class SubscriptionApi {
     });
   }
 
-  // Razorpay integration helpers
+  // Razorpay integration helpers (updated for new API)
   generateRazorpayOptions(subscription: CreateSubscriptionResponse, customerData: CustomerData) {
     return {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -353,7 +328,7 @@ class SubscriptionApi {
       },
       prefill: {
         name: customerData.name,
-        email: customerData.email,
+        email: customerData.personalEmail, // Use personal email for subscription users
         contact: customerData.contact
       },
       theme: {

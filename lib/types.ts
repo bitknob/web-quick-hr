@@ -47,6 +47,11 @@ export interface Employee {
     userCompEmail: string;
     jobTitle: string;
   };
+  company?: {
+    id: string;
+    name: string;
+    code: string;
+  };
 }
 
 export interface UserCredentials {

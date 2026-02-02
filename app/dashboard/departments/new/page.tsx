@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { departmentsApi } from "@/lib/api/departments";
 import { employeesApi } from "@/lib/api/employees";
 import { companiesApi } from "@/lib/api/companies";
@@ -18,14 +18,28 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
-const newDepartmentSchema = z.object({
-  companyId: z.string().min(1, "Company is required"),
+const departmentSchema = z.object({
   name: z.string().min(1, "Department name is required"),
   description: z.string().optional(),
   headId: z.string().optional(),
 });
 
-type NewDepartmentFormData = z.infer<typeof newDepartmentSchema>;
+type DepartmentFormData = z.infer<typeof departmentSchema>;
+
+interface DepartmentField {
+  id: string;
+  name: string;
+  description: string;
+  headId: string;
+  headName: string;
+}
+
+const bulkDepartmentSchema = z.object({
+  companyId: z.string().min(1, "Company is required"),
+  departments: z.array(departmentSchema).min(1, "At least one department is required"),
+});
+
+type BulkDepartmentFormData = z.infer<typeof bulkDepartmentSchema>;
 
 export default function NewDepartmentPage() {
   const router = useRouter();
@@ -38,8 +52,18 @@ export default function NewDepartmentPage() {
 
   const [employeeOptions, setEmployeeOptions] = useState<AutocompleteOption[]>([]);
   const [isSearchingEmployees, setIsSearchingEmployees] = useState(false);
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
-  const debouncedEmployeeSearch = useDebounce(employeeSearchTerm, 300);
+  const [employeeSearchTerms, setEmployeeSearchTerms] = useState<Record<string, string>>({});
+  const debouncedEmployeeSearches = useDebounce(employeeSearchTerms, 300);
+
+  const [departments, setDepartments] = useState<DepartmentField[]>([
+    {
+      id: "dept-1",
+      name: "",
+      description: "",
+      headId: "",
+      headName: "",
+    },
+  ]);
 
   const {
     register,
@@ -47,12 +71,14 @@ export default function NewDepartmentPage() {
     formState: { errors },
     setValue,
     watch,
-  } = useForm<NewDepartmentFormData>({
-    resolver: zodResolver(newDepartmentSchema),
+  } = useForm<BulkDepartmentFormData>({
+    resolver: zodResolver(bulkDepartmentSchema),
+    defaultValues: {
+      departments: [{ name: "", description: "", headId: "" }],
+    },
   });
 
   const companyId = watch("companyId");
-  const headId = watch("headId");
 
   // Search companies
   const searchCompanies = async (searchTerm: string) => {
@@ -82,10 +108,9 @@ export default function NewDepartmentPage() {
     }
   };
 
-  // Search employees
-  const searchEmployees = useCallback(async (searchTerm: string) => {
+  // Search employees for a specific department
+  const searchEmployeesForDepartment = useCallback(async (searchTerm: string, departmentId: string) => {
     if (!searchTerm || searchTerm.length < 2 || !companyId) {
-      setEmployeeOptions([]);
       return;
     }
 
@@ -118,18 +143,9 @@ export default function NewDepartmentPage() {
   }, [debouncedCompanySearch]);
 
   useEffect(() => {
-    if (debouncedEmployeeSearch && companyId) {
-      searchEmployees(debouncedEmployeeSearch);
-    } else {
-      setEmployeeOptions([]);
-    }
-  }, [debouncedEmployeeSearch, companyId, searchEmployees]);
-
-  useEffect(() => {
     const fetchCurrentEmployee = async () => {
       try {
         const response = await employeesApi.getCurrentEmployee();
-        // Type guard: check if response is an Employee (has companyId) vs SuperAdminEmployeeResponse
         if (response.response && 'companyId' in response.response && response.response.companyId) {
           setValue("companyId", response.response.companyId);
           try {
@@ -169,42 +185,94 @@ export default function NewDepartmentPage() {
     setCompanySearchTerm(searchTerm);
   };
 
-  const handleEmployeeSelect = (option: AutocompleteOption | null) => {
-    if (option) {
-      setValue("headId", option.id, { shouldValidate: true });
-      setEmployeeSearchTerm(option.label);
-    } else {
-      setValue("headId", "", { shouldValidate: true });
-      setEmployeeSearchTerm("");
+  const addDepartment = () => {
+    const newDepartment: DepartmentField = {
+      id: `dept-${Date.now()}`,
+      name: "",
+      description: "",
+      headId: "",
+      headName: "",
+    };
+    setDepartments([...departments, newDepartment]);
+    setValue("departments", [...departments, { name: "", description: "", headId: "" }]);
+  };
+
+  const removeDepartment = (departmentId: string) => {
+    if (departments.length > 1) {
+      const updatedDepartments = departments.filter(dept => dept.id !== departmentId);
+      setDepartments(updatedDepartments);
+      setValue("departments", updatedDepartments.map(dept => ({
+        name: dept.name,
+        description: dept.description,
+        headId: dept.headId,
+      })));
     }
   };
 
-  const handleEmployeeSearch = (searchTerm: string) => {
-    setEmployeeSearchTerm(searchTerm);
+  const updateDepartment = (departmentId: string, field: keyof DepartmentField, value: string) => {
+    const updatedDepartments = departments.map(dept => 
+      dept.id === departmentId ? { ...dept, [field]: value } : dept
+    );
+    setDepartments(updatedDepartments);
+    
+    // Update form values
+    const deptIndex = departments.findIndex(dept => dept.id === departmentId);
+    if (deptIndex !== -1) {
+      const currentFormValues = watch("departments") || [];
+      const updatedFormValues = [...currentFormValues];
+      updatedFormValues[deptIndex] = {
+        ...updatedFormValues[deptIndex],
+        [field]: value,
+      };
+      setValue("departments", updatedFormValues);
+    }
   };
 
-  const onSubmit = async (data: NewDepartmentFormData) => {
+  const handleEmployeeSelect = (departmentId: string, option: AutocompleteOption | null) => {
+    if (option) {
+      updateDepartment(departmentId, "headId", option.id);
+      updateDepartment(departmentId, "headName", option.label);
+      setEmployeeSearchTerms({ ...employeeSearchTerms, [departmentId]: "" });
+    } else {
+      updateDepartment(departmentId, "headId", "");
+      updateDepartment(departmentId, "headName", "");
+      setEmployeeSearchTerms({ ...employeeSearchTerms, [departmentId]: "" });
+    }
+  };
+
+  const handleEmployeeSearch = (departmentId: string, searchTerm: string) => {
+    setEmployeeSearchTerms({ ...employeeSearchTerms, [departmentId]: searchTerm });
+    searchEmployeesForDepartment(searchTerm, departmentId);
+  };
+
+  const onSubmit = async (data: BulkDepartmentFormData) => {
     setIsSaving(true);
     try {
-      const response = await departmentsApi.createDepartment({
-        companyId: data.companyId,
-        name: data.name,
-        description: data.description || undefined,
-        headId: data.headId || undefined,
-      });
+      // Create all departments
+      const promises = data.departments.map(dept =>
+        departmentsApi.createDepartment({
+          companyId: data.companyId,
+          name: dept.name,
+          description: dept.description || undefined,
+          headId: dept.headId || undefined,
+        })
+      );
+
+      await Promise.all(promises);
+
       addToast({
         title: "Success",
-        description: "Department created successfully",
+        description: `${data.departments.length} department(s) created successfully`,
         variant: "success",
       });
-      router.push(`/dashboard/departments/${response.response.id}`);
+      router.push("/dashboard/departments");
     } catch (error: unknown) {
       const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { header?: { responseMessage?: string } } } }).response?.data?.header?.responseMessage
+        ? ((error as any).response?.data?.header?.responseMessage as string)
         : undefined;
       addToast({
         title: "Error",
-        description: errorMessage || "Failed to create department",
+        description: errorMessage || "Failed to create departments",
         variant: "error",
       });
     } finally {
@@ -224,8 +292,8 @@ export default function NewDepartmentPage() {
           Back
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Create New Department</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Add a new department to the system</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Create Departments</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Add multiple departments to a company</p>
         </div>
       </motion.div>
 
@@ -236,77 +304,113 @@ export default function NewDepartmentPage() {
       >
         <Card>
           <CardHeader>
-            <CardTitle>Department Information</CardTitle>
+            <CardTitle>Company Selection</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Autocomplete
-                    label="Company"
-                    placeholder="Search for a company..."
-                    options={companyOptions}
-                    onSelect={handleCompanySelect}
-                    onSearch={handleCompanySearch}
-                    value={companyId}
-                    isLoading={isSearchingCompanies}
-                    required
-                    error={errors.companyId?.message}
-                    emptyMessage="No companies found. Try a different search term."
-                  />
-                </div>
+            <div className="max-w-md">
+              <Autocomplete
+                label="Company"
+                placeholder="Search for a company..."
+                options={companyOptions}
+                onSelect={handleCompanySelect}
+                onSearch={handleCompanySearch}
+                value={companyId}
+                isLoading={isSearchingCompanies}
+                required
+                error={errors.companyId?.message}
+                emptyMessage="No companies found. Try a different search term."
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Department Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    id="name"
-                    placeholder="Engineering"
-                    {...register("name")}
-                    className={errors.name ? "border-red-500" : ""}
-                  />
-                  {errors.name && (
-                    <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
-                  )}
-                </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Departments</CardTitle>
+              <Button onClick={addDepartment} variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Department
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {departments.map((department, index) => (
+                <div key={department.id} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Department {index + 1}</h3>
+                    {departments.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeDepartment(department.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
 
-                <div className="md:col-span-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Description
-                  </label>
-                  <Input
-                    id="description"
-                    placeholder="Enter department description"
-                    {...register("description")}
-                  />
-                </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Department Name <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        placeholder="Engineering"
+                        value={department.name}
+                        onChange={(e) => updateDepartment(department.id, "name", e.target.value)}
+                        className={!department.name ? "border-red-500" : ""}
+                      />
+                    </div>
 
-                <div>
-                  <Autocomplete
-                    label="Department Head"
-                    placeholder={companyId ? "Search for an employee..." : "Select company first"}
-                    options={employeeOptions}
-                    onSelect={handleEmployeeSelect}
-                    onSearch={handleEmployeeSearch}
-                    value={headId}
-                    isLoading={isSearchingEmployees}
-                    disabled={!companyId}
-                    error={errors.headId?.message}
-                    emptyMessage="No employees found. Try a different search term."
-                  />
-                  {!companyId && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Please select a company first to search for employees
-                    </p>
-                  )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Department Head
+                      </label>
+                      <Autocomplete
+                        placeholder={companyId ? "Search for an employee..." : "Select company first"}
+                        options={employeeOptions}
+                        onSelect={(option) => handleEmployeeSelect(department.id, option)}
+                        onSearch={(searchTerm) => handleEmployeeSearch(department.id, searchTerm)}
+                        value={department.headId}
+                        isLoading={isSearchingEmployees}
+                        disabled={!companyId}
+                        emptyMessage="No employees found. Try a different search term."
+                      />
+                      {!companyId && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Please select a company first to search for employees
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Description
+                      </label>
+                      <Input
+                        placeholder="Enter department description"
+                        value={department.description}
+                        onChange={(e) => updateDepartment(department.id, "description", e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
 
               <div className="pt-4 flex items-center gap-4">
-                <Button type="submit" isLoading={isSaving}>
+                <Button type="submit" isLoading={isSaving} disabled={!companyId || departments.some(dept => !dept.name)}>
                   <Save className="h-4 w-4 mr-2" />
-                  Create Department
+                  Create {departments.length} Department{departments.length > 1 ? 's' : ''}
                 </Button>
                 <Button
                   type="button"

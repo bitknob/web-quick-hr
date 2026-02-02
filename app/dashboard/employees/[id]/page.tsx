@@ -6,11 +6,12 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Shield, UserCog, Send, Trash2, Users, UserPlus, FileText, KeyRound } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCog, Send, Trash2, Users, UserPlus, FileText, KeyRound, Building2, Calendar, Clock } from "lucide-react";
 import { employeesApi } from "@/lib/api/employees";
 import { companiesApi } from "@/lib/api/companies";
+import { departmentsApi } from "@/lib/api/departments";
 import { authApi } from "@/lib/api/auth";
-import { Employee, User, Company } from "@/lib/types";
+import { Employee, User, Company, Department } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,9 +28,13 @@ const employeeSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
   phoneNumber: z.string().optional(),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  address: z.string().optional(),
   jobTitle: z.string().min(1, "Job title is required"),
   department: z.string().min(1, "Department is required"),
-  salary: z.number().optional(),
+  hireDate: z.string().min(1, "Hire date is required"),
+  salary: z.number().min(0, "Salary must be a positive number"),
+  status: z.enum(["active", "inactive"]).optional(),
 });
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
@@ -55,6 +60,8 @@ export default function EmployeeDetailPage() {
   const [isSearchingManagers, setIsSearchingManagers] = useState(false);
   const [selectedNewManager, setSelectedNewManager] = useState<AutocompleteOption | null>(null);
   const [showTransferUI, setShowTransferUI] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
 
   const {
     register,
@@ -110,9 +117,13 @@ export default function EmployeeDetailPage() {
         lastName: response.response.lastName,
         email: response.response.userCompEmail,
         phoneNumber: response.response.phoneNumber || "",
+        dateOfBirth: response.response.dateOfBirth || "",
+        address: response.response.address || "",
         jobTitle: response.response.jobTitle,
         department: response.response.department,
+        hireDate: response.response.hireDate,
         salary: response.response.salary,
+        status: response.response.status,
       });
       // Fetch user role information using email
       if (response.response.userCompEmail) {
@@ -120,6 +131,8 @@ export default function EmployeeDetailPage() {
       }
       // Fetch direct reports
       fetchDirectReports(response.response.id);
+      // Fetch departments for dropdown
+      fetchDepartments(response.response.companyId);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       addToast({
@@ -161,6 +174,19 @@ export default function EmployeeDetailPage() {
       console.error("Failed to fetch direct reports:", error);
     } finally {
       setIsLoadingDirectReports(false);
+    }
+  };
+
+  const fetchDepartments = async (companyId: string) => {
+    setIsLoadingDepartments(true);
+    try {
+      const response = await departmentsApi.getDepartments({ companyId });
+      setDepartments(response.response || []);
+    } catch (error) {
+      console.error("Failed to fetch departments:", error);
+      setDepartments([]);
+    } finally {
+      setIsLoadingDepartments(false);
     }
   };
 
@@ -367,6 +393,113 @@ export default function EmployeeDetailPage() {
         </div>
       </motion.div>
 
+      {/* Metadata Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              Employee Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Company Information */}
+              {employee.company && (
+                <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    Company
+                  </p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{employee.company.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Code: {employee.company.code}</p>
+                </div>
+              )}
+
+              {/* Employee Status */}
+              <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Status</p>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${employee.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={`font-semibold capitalize ${employee.status === 'active' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                    {employee.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Hire Date */}
+              <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Hire Date
+                </p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">
+                  {new Date(employee.hireDate).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+
+              {/* Created At */}
+              <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Created
+                </p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {new Date(employee.createdAt).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {new Date(employee.createdAt).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </p>
+              </div>
+
+              {/* Updated At */}
+              <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Last Updated
+                </p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {new Date(employee.updatedAt).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {new Date(employee.updatedAt).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </p>
+              </div>
+
+              {/* User Email */}
+              <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">User Email</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100 text-sm break-all">
+                  {employee.userEmail}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* User Role Information Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -546,7 +679,7 @@ export default function EmployeeDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    First Name
+                    First Name <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="firstName"
@@ -560,7 +693,7 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Last Name
+                    Last Name <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="lastName"
@@ -574,7 +707,7 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="email"
@@ -612,8 +745,38 @@ export default function EmployeeDetailPage() {
                 </div>
 
                 <div>
+                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="dateOfBirth"
+                    type="date"
+                    {...register("dateOfBirth")}
+                    className={errors.dateOfBirth ? "border-red-500" : ""}
+                  />
+                  {errors.dateOfBirth && (
+                    <p className="text-sm text-red-500 mt-1">{errors.dateOfBirth.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="hireDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Hire Date <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="hireDate"
+                    type="date"
+                    {...register("hireDate")}
+                    className={errors.hireDate ? "border-red-500" : ""}
+                  />
+                  {errors.hireDate && (
+                    <p className="text-sm text-red-500 mt-1">{errors.hireDate.message}</p>
+                  )}
+                </div>
+
+                <div>
                   <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Job Title
+                    Job Title <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="jobTitle"
@@ -627,13 +790,25 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Department
+                    Department <span className="text-red-500">*</span>
                   </label>
-                  <Input
+                  <select
                     id="department"
                     {...register("department")}
-                    className={errors.department ? "border-red-500" : ""}
-                  />
+                    className={`flex h-10 w-full rounded-lg border-2 ${
+                      errors.department ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                    } bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ring-offset-white dark:ring-offset-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:border-blue-500 dark:focus-visible:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm hover:border-gray-400 dark:hover:border-gray-500`}
+                    disabled={isLoadingDepartments}
+                  >
+                    <option value="">
+                      {isLoadingDepartments ? "Loading departments..." : "Select a department"}
+                    </option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
                   {errors.department && (
                     <p className="text-sm text-red-500 mt-1">{errors.department.message}</p>
                   )}
@@ -641,7 +816,7 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Salary
+                    Salary <span className="text-red-500">*</span>
                   </label>
                   <Controller
                     name="salary"
@@ -655,6 +830,33 @@ export default function EmployeeDetailPage() {
                     )}
                   />
                 </div>
+
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status"
+                    {...register("status")}
+                    className="flex h-10 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ring-offset-white dark:ring-offset-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:border-blue-500 dark:focus-visible:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Address
+                </label>
+                <textarea
+                  id="address"
+                  {...register("address")}
+                  rows={3}
+                  className="flex w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ring-offset-white dark:ring-offset-gray-900 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:border-blue-500 dark:focus-visible:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+                  placeholder="Enter full address"
+                />
               </div>
 
               <div className="pt-4">
