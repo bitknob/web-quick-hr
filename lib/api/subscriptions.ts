@@ -26,7 +26,7 @@ class SubscriptionApi {
   }
 
   async getSubscriptionById(subscriptionId: number): Promise<CreateSubscriptionResponse> {
-    const response = await apiClient.get<ApiResponse<CreateSubscriptionResponse>>(`/api/subscriptions/${subscriptionId}`);
+    const response = await apiClient.get<CreateSubscriptionResponse>(`/api/subscriptions/${subscriptionId}`);
     return response.response;
   }
 

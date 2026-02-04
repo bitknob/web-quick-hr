@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Company } from "@/lib/types";
@@ -158,7 +159,8 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
   };
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <>
+      <Card className="max-w-2xl mx-auto">
       <div className="p-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           {company ? "Edit Company" : "Create New Company"}
@@ -302,8 +304,10 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
                 className={errors.subscriptionEndsAt ? "border-red-500" : ""}
               />
               {errors.subscriptionEndsAt && (
+                <p className="text-red-500 text-xs mt-1">{errors.subscriptionEndsAt.message}</p>
+              )}
+            </div>
           )}
-        </div>
 
         {/* Status and Subscription */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -409,4 +413,6 @@ export function CompanyForm({ company, onSuccess, onCancel }: CompanyFormProps) 
     onConfirm={() => setShowErrorDialog(false)}
     onOpenChange={(open) => !open && setShowErrorDialog(false)}
   />
-</>
+    </>
+  );
+}

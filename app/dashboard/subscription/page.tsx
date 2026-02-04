@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SubscriptionStatusCard } from "@/components/subscriptions/subscription-status-card";
-import { SubscriptionCreation } from "@/components/subscriptions/subscription-creation";
+import SubscriptionCreation from "@/components/subscriptions/subscription-creation";
 import { subscriptionApi } from "@/lib/api/subscriptions";
 import { pricingApi } from "@/lib/api/pricing";
 import { useToast } from "@/components/ui/toast";
@@ -216,7 +216,7 @@ export default function SubscriptionPage() {
           {viewMode === "create" && (
             <SubscriptionCreation
               availablePlans={availablePlans}
-              initialPlanId={selectedPlanId}
+              initialPlanId={selectedPlanId || undefined}
               initialInterval={selectedInterval}
               onSuccess={handleSubscriptionSuccess}
               onCancel={handleCancel}

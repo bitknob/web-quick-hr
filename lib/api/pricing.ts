@@ -18,17 +18,7 @@ class PricingApi {
     const response = await apiClient.get<PricingPlansResponse>(`/api/pricing-plans?${params.toString()}`);
     console.log('API Response:', JSON.stringify(response, null, 2));
     
-    // Try different access patterns
-    if (response.response?.response?.pricingPlans) {
-      return response.response.response.pricingPlans;
-    } else if (response.response?.pricingPlans) {
-      return response.response.pricingPlans;
-    } else if (response.pricingPlans) {
-      return response.pricingPlans;
-    } else {
-      console.error('Unable to find pricingPlans in response. Response structure:', response);
-      throw new Error('Invalid API response structure');
-    }
+    return response.response.response.pricingPlans;
   }
 
   async getPricingPlan(id: number): Promise<PricingPlan> {

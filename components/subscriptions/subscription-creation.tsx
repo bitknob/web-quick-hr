@@ -125,10 +125,7 @@ export default function SubscriptionCreation({
       setShowSuccessDialog(true);
 
       // Pass both subscription response and customer data to success callback
-      onSuccess?.({
-        ...response,
-        customerData: subscriptionData.customerData
-      });
+      onSuccess?.(response);
     } catch (error) {
       console.error("Failed to create subscription:", error);
       setDialogMessage("Failed to create subscription. Please try again.");

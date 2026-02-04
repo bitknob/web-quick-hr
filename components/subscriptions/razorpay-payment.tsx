@@ -167,7 +167,7 @@ export function RazorpayPayment({
       },
       prefill: {
         name: customerData.name,
-        email: customerData.email,
+        email: customerData.personalEmail,
         contact: customerData.contact,
       },
       notes: {

@@ -214,7 +214,7 @@ function PublicSubscriptionPageContent() {
 
               <SubscriptionCreation
                 availablePlans={availablePlans}
-                initialPlanId={selectedPlanId}
+                initialPlanId={selectedPlanId || undefined}
                 initialInterval={selectedInterval}
                 onSuccess={handleSubscriptionSuccess}
                 onCancel={handleBackToPricing}
